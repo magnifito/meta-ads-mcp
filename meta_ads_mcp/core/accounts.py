@@ -1,9 +1,13 @@
 """Account-related functionality for Meta Ads API."""
 
 import json
+import logging
+import os
 from typing import Optional, Dict, Any
 from .api import meta_api_tool, make_api_request, ensure_act_prefix
 from .server import mcp_server
+
+logger = logging.getLogger(__name__)
 
 # Currencies that have no sub-units (i.e., are not denominated in cents).
 # Meta API returns amount_spent and balance as integers in the smallest currency
@@ -53,13 +57,41 @@ async def get_ad_accounts(access_token: Optional[str] = None, user_id: str = "me
         user_id: Meta user ID or "me" for the current user
         limit: Maximum number of accounts to return (default: 200)
     """
-    endpoint = f"{user_id}/adaccounts"
-    params = {
-        "fields": "id,name,account_id,account_status,amount_spent,balance,currency,age,business_city,business_country_code",
-        "limit": limit
-    }
+    fields = "id,name,account_id,account_status,amount_spent,balance,currency,age,business_city,business_country_code"
 
+    # First get user's direct accounts
+    endpoint = f"{user_id}/adaccounts"
+    params = {"fields": fields, "limit": limit}
     data = await make_api_request(endpoint, access_token, params)
+
+    # Also query Business Manager ad accounts (client + owned edges).
+    # Configure via META_ADS_BM_IDS=comma,separated,ids
+    bm_ids = [s.strip() for s in os.environ.get("META_ADS_BM_IDS", "").split(",") if s.strip()]
+    seen_ids = {acc["id"] for acc in data.get("data", []) if "id" in acc}
+
+    for bm_id in bm_ids:
+        for edge in ("client_ad_accounts", "owned_ad_accounts"):
+            bm_endpoint = f"{bm_id}/{edge}"
+            bm_params = {"fields": fields, "limit": limit}
+            bm_data = await make_api_request(bm_endpoint, access_token, bm_params)
+            for acc in bm_data.get("data", []):
+                if acc.get("id") and acc["id"] not in seen_ids:
+                    data.setdefault("data", []).append(acc)
+                    seen_ids.add(acc["id"])
+
+    # Directly fetch partner-shared accounts that BM edges may miss.
+    # Configure via META_ADS_EXTRA_ACCOUNT_IDS=act_xxx,act_yyy
+    extra_ids = [s.strip() for s in os.environ.get("META_ADS_EXTRA_ACCOUNT_IDS", "").split(",") if s.strip()]
+    for acct_id in extra_ids:
+        if acct_id in seen_ids:
+            continue
+        try:
+            acct_data = await make_api_request(acct_id, access_token, {"fields": fields})
+            if "error" not in acct_data and acct_data.get("id"):
+                data.setdefault("data", []).append(acct_data)
+                seen_ids.add(acct_data["id"])
+        except Exception as e:
+            logger.warning("Could not fetch extra account %s: %s", acct_id, e)
 
     if "data" in data:
         data["data"] = [_normalize_account_monetary_fields(acc) for acc in data["data"]]
