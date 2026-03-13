@@ -11,6 +11,7 @@ import os
 from . import auth
 from .auth import needs_authentication, auth_manager, start_callback_server, shutdown_callback_server
 from .utils import logger
+from .resilience import with_resilience, safe_response
 
 class McpToolError(Exception):
     """Base class for MCP tool errors that must set isError: true.
@@ -154,110 +155,135 @@ async def make_api_request(
     app_id = auth_manager.app_id
     logger.debug(f"Current app_id from auth_manager: {app_id}")
     
-    async with httpx.AsyncClient() as client:
+    from .resilience import MAX_RETRIES, BACKOFF_BASE, BACKOFF_MAX
+    last_error = None
+
+    for attempt in range(1, MAX_RETRIES + 1):
         try:
-            if method == "GET":
-                # For GET, JSON-encode dict/list params (e.g., targeting_spec) to proper strings
-                encoded_params = {}
-                for key, value in request_params.items():
-                    if isinstance(value, (dict, list)):
-                        encoded_params[key] = json.dumps(value)
-                    else:
-                        encoded_params[key] = value
-                response = await client.get(url, params=encoded_params, headers=headers, timeout=30.0)
-            elif method == "POST":
-                # For Meta API, POST requests need data, not JSON
-                if 'targeting' in request_params and isinstance(request_params['targeting'], dict):
-                    # Convert targeting dict to string for the API
-                    request_params['targeting'] = json.dumps(request_params['targeting'])
-                
-                # Convert lists and dicts to JSON strings    
-                for key, value in request_params.items():
-                    if isinstance(value, (list, dict)):
-                        request_params[key] = json.dumps(value)
-                
-                logger.debug(f"POST params (prepared): {masked_params}")
-                response = await client.post(url, data=request_params, headers=headers, timeout=30.0)
-            elif method == "PUT":
-                # PUT for updates that Meta requires via PUT (e.g., creative_features_spec).
-                # Meta expects access_token as a query param, not in the body.
-                query_params = {}
-                body_params = {}
-                for key, value in request_params.items():
-                    if key in ("access_token", "appsecret_proof"):
-                        query_params[key] = value
-                    elif isinstance(value, (list, dict)):
-                        body_params[key] = json.dumps(value)
-                    else:
-                        body_params[key] = value
-                response = await client.put(url, params=query_params, data=body_params, headers=headers, timeout=30.0)
-            elif method == "DELETE":
-                response = await client.delete(url, params=request_params, headers=headers, timeout=30.0)
-            else:
-                raise ValueError(f"Unsupported HTTP method: {method}")
-            
-            response.raise_for_status()
-            logger.debug(f"API Response status: {response.status_code}")
+            logger.debug("API request %s %s (attempt %d/%d)", method, endpoint, attempt, MAX_RETRIES)
+            async with httpx.AsyncClient() as client:
+                if method == "GET":
+                    encoded_params = {}
+                    for key, value in request_params.items():
+                        if isinstance(value, (dict, list)):
+                            encoded_params[key] = json.dumps(value)
+                        else:
+                            encoded_params[key] = value
+                    response = await asyncio.wait_for(
+                        client.get(url, params=encoded_params, headers=headers, timeout=30.0),
+                        timeout=30.0,
+                    )
+                elif method == "POST":
+                    # Deep copy params so retries don't double-encode
+                    post_params = dict(request_params)
+                    if 'targeting' in post_params and isinstance(post_params['targeting'], dict):
+                        post_params['targeting'] = json.dumps(post_params['targeting'])
+                    for key, value in list(post_params.items()):
+                        if isinstance(value, (list, dict)):
+                            post_params[key] = json.dumps(value)
+                    logger.debug(f"POST params (prepared): {masked_params}")
+                    response = await asyncio.wait_for(
+                        client.post(url, data=post_params, headers=headers, timeout=30.0),
+                        timeout=30.0,
+                    )
+                elif method == "PUT":
+                    # PUT for updates that Meta requires via PUT (e.g., creative_features_spec).
+                    # Meta expects access_token as a query param, not in the body.
+                    query_params = {}
+                    body_params = {}
+                    for key, value in request_params.items():
+                        if key in ("access_token", "appsecret_proof"):
+                            query_params[key] = value
+                        elif isinstance(value, (list, dict)):
+                            body_params[key] = json.dumps(value)
+                        else:
+                            body_params[key] = value
+                    response = await asyncio.wait_for(
+                        client.put(url, params=query_params, data=body_params, headers=headers, timeout=30.0),
+                        timeout=30.0,
+                    )
+                elif method == "DELETE":
+                    response = await asyncio.wait_for(
+                        client.delete(url, params=request_params, headers=headers, timeout=30.0),
+                        timeout=30.0,
+                    )
+                else:
+                    raise ValueError(f"Unsupported HTTP method: {method}")
 
-            # Log Meta rate limit headers for observability
-            _log_meta_rate_limit_headers(response.headers, endpoint)
+                response.raise_for_status()
+                logger.debug(f"API Response status: {response.status_code}")
 
-            # Ensure the response is JSON and return it as a dictionary
-            try:
-                return response.json()
-            except json.JSONDecodeError:
-                # If not JSON, return text content in a structured format
-                return {
-                    "text_response": response.text,
-                    "status_code": response.status_code
-                }
-        
+                # Log Meta rate limit headers for observability
+                _log_meta_rate_limit_headers(response.headers, endpoint)
+
+                try:
+                    return response.json()
+                except json.JSONDecodeError:
+                    return {
+                        "text_response": response.text,
+                        "status_code": response.status_code,
+                    }
+
+        except asyncio.TimeoutError:
+            last_error = TimeoutError(f"API request to {endpoint} timed out after 30s")
+            logger.warning("API request %s timed out (attempt %d/%d)", endpoint, attempt, MAX_RETRIES)
+
+
         except httpx.HTTPStatusError as e:
             error_info = {}
             try:
                 error_info = e.response.json()
-            except:
+            except Exception:
                 error_info = {"status_code": e.response.status_code, "text": e.response.text}
-            
-            logger.error(f"HTTP Error: {e.response.status_code} - {error_info}")
+
+            status_code = e.response.status_code
+            logger.error(f"HTTP Error: {status_code} - {error_info}")
 
             # Log Meta rate limit headers even on errors
             _log_meta_rate_limit_headers(e.response.headers, endpoint)
 
-            # Check for rate limit errors vs authentication errors.
-            # Code 4 is a rate limit (NOT auth) — do NOT invalidate token.
-            if "error" in error_info:
-                error_obj = error_info.get("error", {})
-                error_code = error_obj.get("code") if isinstance(error_obj, dict) else None
+            # Inspect Meta error code for rate-limit vs auth distinction.
+            # Code 4 = application-level rate limit, token still valid → retry.
+            error_obj = error_info.get("error") if isinstance(error_info.get("error"), dict) else {}
+            error_code = error_obj.get("code")
 
+            # Transient: HTTP 429, HTTP 5xx, or Meta error_code 4 (app-level rate limit).
+            if status_code == 429 or status_code >= 500 or error_code == 4:
+                last_error = e
                 if error_code == 4:
-                    # Application-level rate limit — token is still valid
                     logger.warning(
                         f"Facebook API rate limit (code=4, subcode={error_obj.get('error_subcode', 'N/A')}, "
                         f"msg={error_obj.get('error_user_msg', error_obj.get('message', 'N/A'))}). "
-                        f"Token is still valid — NOT invalidating."
+                        f"Token still valid — retrying."
                     )
-                elif error_code in [190, 102, 200, 10]:
-                    logger.warning(f"Detected Facebook API auth error: {error_code}")
-                    if error_code == 200 and "Provide valid app ID" in error_obj.get("message", ""):
-                        logger.error("Meta API authentication configuration issue")
-                        logger.error(f"Current app_id: {app_id}")
-                        return {
-                            "error": {
-                                "message": "Meta API authentication configuration issue. Please check your app credentials.",
-                                "original_error": error_obj.get("message"),
-                                "code": error_code
-                            }
-                        }
-                    auth_manager.invalidate_token()
-                elif e.response.status_code in [401, 403]:
-                    logger.warning(f"Detected authentication error ({e.response.status_code})")
-                    auth_manager.invalidate_token()
-            elif e.response.status_code in [401, 403]:
-                logger.warning(f"Detected authentication error ({e.response.status_code})")
+                else:
+                    logger.warning(
+                        "Transient HTTP %d on %s (attempt %d/%d)",
+                        status_code, endpoint, attempt, MAX_RETRIES,
+                    )
+                if attempt < MAX_RETRIES:
+                    delay = min(BACKOFF_BASE * (2 ** (attempt - 1)), BACKOFF_MAX)
+                    await asyncio.sleep(delay)
+                continue
+
+            # Non-transient. Auth errors invalidate the cached token.
+            if status_code in (401, 403):
+                logger.warning(f"Detected authentication error ({status_code})")
                 auth_manager.invalidate_token()
-            
-            # Include full details for technical users
+            elif error_code in (190, 102, 200, 10):
+                logger.warning(f"Detected Facebook API auth error: {error_code}")
+                if error_code == 200 and "Provide valid app ID" in error_obj.get("message", ""):
+                    logger.error("Meta API authentication configuration issue")
+                    logger.error(f"Current app_id: {app_id}")
+                    return {
+                        "error": {
+                            "message": "Meta API authentication configuration issue. Please check your app credentials.",
+                            "original_error": error_obj.get("message"),
+                            "code": error_code,
+                        }
+                    }
+                auth_manager.invalidate_token()
+
             full_response = {
                 "headers": dict(e.response.headers),
                 "status_code": e.response.status_code,
@@ -266,8 +292,7 @@ async def make_api_request(
                 "request_method": e.request.method,
                 "request_url": str(e.request.url)
             }
-            
-            # Return a properly structured error object
+
             return {
                 "error": {
                     "message": f"HTTP Error: {e.response.status_code}",
@@ -275,10 +300,30 @@ async def make_api_request(
                     "full_response": full_response
                 }
             }
-        
+
         except Exception as e:
-            logger.error(f"Request Error: {str(e)}")
-            return {"error": {"message": str(e)}}
+            last_error = e
+            err_str = str(e).lower()
+
+            # Non-retryable errors fail immediately
+            if any(code in err_str for code in ("400", "invalid", "not found", "permission")):
+                if "429" not in err_str and "rate" not in err_str:
+                    logger.error(f"Non-retryable request error: {e}")
+                    return {"error": {"message": str(e)}}
+
+            logger.warning(
+                "Request error on %s (attempt %d/%d): %s",
+                endpoint, attempt, MAX_RETRIES, e,
+            )
+
+        # Backoff before next retry
+        if attempt < MAX_RETRIES:
+            delay = min(BACKOFF_BASE * (2 ** (attempt - 1)), BACKOFF_MAX)
+            await asyncio.sleep(delay)
+
+    # All retries exhausted
+    logger.error("API request to %s failed after %d retries: %s", endpoint, MAX_RETRIES, last_error)
+    return {"error": {"message": f"Request failed after {MAX_RETRIES} retries: {last_error}"}}
 
 
 # Generic wrapper for all Meta API tools
@@ -386,7 +431,7 @@ def meta_api_tool(func):
                 
             # Call the original function
             result = await func(*args, **kwargs)
-            
+
             # If the result is a string (JSON), try to parse it to check for errors
             if isinstance(result, str):
                 try:
@@ -414,11 +459,15 @@ def meta_api_tool(func):
                 except Exception:
                     # Not JSON or other parsing error, wrap it in a dictionary
                     return json.dumps({"data": result}, indent=2)
-            
+
             # If result is already a dictionary, ensure it's properly serialized
             if isinstance(result, dict):
-                return json.dumps(result, indent=2)
-            
+                result = json.dumps(result, indent=2)
+
+            # Apply safe_response to limit response size
+            if isinstance(result, str):
+                result = safe_response(result, func.__name__)
+
             return result
         except McpToolError:
             raise  # Let FastMCP set isError: true and refund the usage credit
