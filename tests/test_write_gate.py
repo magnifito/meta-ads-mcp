@@ -30,6 +30,7 @@ from meta_ads_mcp.core.write_gate import (
 # trip the drift alarm below.
 READ_TOOLS = frozenset(
     {
+        "compute_image_crops",
         "estimate_audience_size",
         "fetch",
         "get_account_info",
@@ -38,11 +39,13 @@ READ_TOOLS = frozenset(
         "get_ad_creatives",
         "get_ad_details",
         "get_ad_image",
+        "get_ad_video",
         "get_ads",
         "get_adset_details",
         "get_adsets",
         "get_campaign_details",
         "get_campaigns",
+        "get_creative_details",
         "get_insights",
         "get_interest_suggestions",
         "get_login_link",
