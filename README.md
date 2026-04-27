@@ -1,449 +1,211 @@
 # Meta Ads MCP
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for interacting with Meta Ads. Analyze, manage and optimize Meta advertising campaigns through an AI interface. Use an LLM to retrieve performance data, visualize ad creatives, and provide strategic insights for your ads on Facebook, Instagram, and other Meta platforms.
+A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for Meta Ads. Lets an LLM analyze, manage, and optimize Meta ad campaigns (Facebook, Instagram, etc.) through structured tool calls against the Meta Graph API.
 
 > **Note:** Independent open-source project that uses Meta's public APIs. Meta, Facebook, Instagram, and other Meta brand names are trademarks of their respective owners.
 
-This fork is maintained for local use: it runs as a stdio MCP process on your own machine and authenticates directly against the Meta Graph API using either a System User access token or a local OAuth flow. There is no cloud relay in this build.
+This fork is maintained for **local-first** use. It runs as either:
+- a **stdio** subprocess (for Claude Desktop / Claude Code / Cursor / etc.), or
+- a **streamable-http** server (for self-hosted deploys behind a reverse proxy, e.g. Dokploy + Traefik).
+
+There is no cloud relay — every request goes directly from your process to `graph.facebook.com`.
 
 ## Table of Contents
 
-- [Getting Started (Local)](#getting-started-local)
+- [Quick Start (stdio)](#quick-start-stdio)
 - [Authentication](#authentication)
-- [Features](#features)
 - [Configuration](#configuration)
-- [Available MCP Tools](#available-mcp-tools)
+- [Hosted Deploy (Docker + Dokploy + Traefik)](#hosted-deploy-docker--dokploy--traefik)
+- [Available Tools](#available-tools)
+- [Testing](#testing)
 - [Licensing](#licensing)
 - [Privacy and Security](#privacy-and-security)
-- [Testing](#testing)
 - [Troubleshooting](#troubleshooting)
 
-## Getting Started (Local)
+## Quick Start (stdio)
 
-1. Install from source (inside a virtualenv):
-   ```bash
-   pip install -e .
-   ```
-2. Provide credentials via environment variables (see [Authentication](#authentication)).
-3. Run the server over stdio (the transport every MCP client speaks):
-   ```bash
-   python -m meta_ads_mcp
-   ```
-4. Point your MCP client (Claude Desktop, Cursor, etc.) at the local command.
+Install from source:
 
-An optional local HTTP transport is also available for custom integrations — see [STREAMABLE_HTTP_SETUP.md](STREAMABLE_HTTP_SETUP.md).
+```bash
+pip install -e .
+```
+
+Provide a Meta token (see [Authentication](#authentication)) and run:
+
+```bash
+META_ACCESS_TOKEN="EAAB..." python -m meta_ads_mcp
+```
+
+Wire into Claude Code:
+
+```bash
+claude mcp add meta-ads \
+  --env META_ACCESS_TOKEN=EAAB... \
+  --env META_ADS_MCP_WRITE=true \
+  -- python -m meta_ads_mcp
+```
+
+Or hand-edit `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "meta-ads": {
+      "command": "python",
+      "args": ["-m", "meta_ads_mcp"],
+      "env": {
+        "META_ACCESS_TOKEN": "EAAB...",
+        "META_ADS_MCP_WRITE": "true"
+      }
+    }
+  }
+}
+```
+
+Restart the client and verify with `/mcp` — `meta-ads` should be listed as connected.
 
 ## Authentication
 
-Two local modes are supported. Pick one.
+Two modes. Pick one.
 
 ### 1. Direct System User token (recommended)
 
-The simplest setup. Generate a System User access token in your Meta Business account, export it, and you are done:
+Mint a long-lived System User token in Meta Business Suite, export it, done:
 
 ```bash
-export META_ACCESS_TOKEN="EAAG..."
+export META_ACCESS_TOKEN="EAAB..."
+export META_APP_SECRET="..."   # optional but strongly recommended (enables appsecret_proof signing)
 ```
 
-The token is used as-is for every Graph API call. No OAuth round-trip. No local callback server. No cloud relay.
+The token is used as-is for every Graph API call. No OAuth round-trip.
 
 ### 2. Local OAuth flow
 
-If you want the MCP itself to mint a user access token for you, set your Meta Developer App credentials:
-
 ```bash
-export META_APP_ID="<your Meta App ID>"
-export META_APP_SECRET="<your Meta App secret>"   # required to exchange for long-lived tokens
+export META_APP_ID="<Meta App ID>"
+export META_APP_SECRET="<Meta App secret>"   # required for long-lived-token exchange
+python -m meta_ads_mcp --login
 ```
 
-Then either:
+Or call the `get_login_link` MCP tool — the server starts a callback listener on `localhost:<port>/callback` and returns a clickable Facebook OAuth URL. Tokens cache to:
 
-- Run `python -m meta_ads_mcp --login` once to complete the OAuth flow, or
-- Call the `get_login_link` MCP tool from your client — the server starts a short-lived callback listener on `localhost:<port>/callback` and returns a clickable Facebook OAuth URL. When you approve, the token is cached under `~/Library/Application Support/meta-ads-mcp/token_cache.json` (macOS) / `~/.config/meta-ads-mcp/` (Linux) / `%APPDATA%\meta-ads-mcp\` (Windows).
+- macOS: `~/Library/Application Support/meta-ads-mcp/token_cache.json`
+- Linux: `~/.config/meta-ads-mcp/token_cache.json`
+- Windows: `%APPDATA%\meta-ads-mcp\token_cache.json`
 
-If `META_ACCESS_TOKEN` is set it takes precedence over any cached OAuth token.
-
-## Features
-
-- **AI-Powered Campaign Analysis**: Let your favorite LLM analyze your campaigns and provide actionable insights on performance
-- **Strategic Recommendations**: Receive data-backed suggestions for optimizing ad spend, targeting, and creative content
-- **Automated Monitoring**: Ask any MCP-compatible LLM to track performance metrics and alert you about significant changes
-- **Budget Optimization**: Get recommendations for reallocating budget to better-performing ad sets
-- **Creative Improvement**: Receive feedback on ad copy, imagery, and calls-to-action
-- **Dynamic Creative Testing**: Easy API for both simple ads (single headline/description) and advanced A/B testing (multiple headlines/descriptions)
-- **Campaign Management**: Request changes to campaigns, ad sets, and ads (all changes require explicit confirmation)
-- **Cross-Platform Integration**: Works with Facebook, Instagram, and all Meta ad platforms
-- **Universal LLM Support**: Compatible with any MCP client including Claude Desktop, Cursor, Cherry Studio, and more
-- **Enhanced Search**: Generic search function includes page searching when queries mention "page" or "pages"
-- **Cross-Platform Support**: Works on Windows, macOS, and Linux
+If `META_ACCESS_TOKEN` is set it always takes precedence.
 
 ## Configuration
 
 ### Read-only by default
 
-The server **defaults to read-only mode**. Mutating tools (create / update / upload on campaigns, adsets, ads, creatives, images, and budget schedules) are hidden from the tool list and refused at call time unless you explicitly opt in by setting the environment variable `META_ADS_MCP_WRITE=true`.
-
-This exists because a casual chat request ("go ahead and pause that") routed to an LLM that has this MCP connected can otherwise change live ad spend before anyone notices. Read-only is the safe default; flip the flag when you intentionally want to mutate.
+The server **defaults to read-only**. Mutating tools (create / update / upload on campaigns, adsets, ads, creatives, images, budget schedules) are hidden from `tools/list` and refused at call time unless `META_ADS_MCP_WRITE=true` is set. This prevents an LLM from changing live ad spend on a casual chat request.
 
 ### Environment variables
 
+See [`.env.example`](.env.example) for a copy-paste template with notes. Most-used:
+
 | Variable | Purpose |
 | --- | --- |
-| `META_ADS_MCP_WRITE` | Set to `true` (or `1` / `yes`) to enable mutating tools. **Defaults to off.** |
+| `META_ADS_MCP_WRITE` | `true`/`1`/`yes` to enable mutating tools. **Defaults to off.** |
 | `META_ACCESS_TOKEN` | Meta System User access token. Used as-is for every API call. |
 | `META_APP_ID` | Meta App ID for the local OAuth flow. Not needed when `META_ACCESS_TOKEN` is set. |
-| `META_APP_SECRET` | Meta App secret. Required for exchanging short-lived tokens for long-lived ones in the local OAuth flow. |
-| `META_ADS_DISABLE_CALLBACK_SERVER` | Disables the local OAuth callback server. |
-| `META_ADS_DISABLE_LOGIN_LINK` | Hides the `get_login_link` tool. |
-| `META_ADS_DISABLE_ADS_LIBRARY` | Hides the `search_ads_archive` tool. |
-| `META_ADS_ENABLE_REPORTS` | Registers the `generate_report` tool (stub in this build). |
+| `META_APP_SECRET` | Meta App secret. Enables `appsecret_proof` signing on every Graph API call. |
+| `META_ADS_BM_IDS` | Comma-separated Business Manager IDs to scan via `client_ad_accounts` + `owned_ad_accounts` edges in `get_ad_accounts`. |
+| `META_ADS_EXTRA_ACCOUNT_IDS` | Comma-separated extra `act_xxx` IDs to direct-fetch even when not in any BM edge. |
+| `META_ADS_DISABLE_LOGIN_LINK` | Hides the `get_login_link` tool. Recommended for hosted deploys. |
+| `META_ADS_DISABLE_CALLBACK_SERVER` | Disables the local OAuth callback listener. Recommended for hosted deploys. |
+| `META_ADS_DISABLE_ADS_LIBRARY` | Hides `search_ads_archive`. |
+| `META_ADS_ENABLE_REPORTS` | Registers `generate_report`. |
+| `MCP_HTTP_PATH` | Mount path for streamable-http transport (default `/mcp`). The Dockerfile defaults this to `/meta`. |
 
-### Available MCP Tools
+## Hosted Deploy (Docker + Dokploy + Traefik)
 
-1. `mcp_meta_ads_get_ad_accounts`
-   - Get ad accounts accessible by a user
-   - Inputs:
-     - `access_token` (optional): Meta API access token (will use cached token if not provided)
-     - `user_id`: Meta user ID or "me" for the current user
-     - `limit`: Maximum number of accounts to return (default: 200)
-   - Returns: List of accessible ad accounts with their details
+The repo ships a [`Dockerfile`](Dockerfile) and [`docker-compose.yml`](docker-compose.yml) configured for Dokploy + Traefik. Default route: `https://mcp.<your-domain>/meta`.
 
-2. `mcp_meta_ads_get_account_info`
-   - Get detailed information about a specific ad account
-   - Inputs:
-     - `access_token` (optional): Meta API access token (will use cached token if not provided)
-     - `account_id`: Meta Ads account ID (format: act_XXXXXXXXX)
-   - Returns: Detailed information about the specified account
+### Multi-tenant model
 
-3. `mcp_meta_ads_get_account_pages`
-   - Get pages associated with a Meta Ads account
-   - Inputs:
-     - `access_token` (optional): Meta API access token (will use cached token if not provided)
-     - `account_id`: Meta Ads account ID (format: act_XXXXXXXXX) or "me" for the current user's pages
-   - Returns: List of pages associated with the account, useful for ad creation and management
+The hosted server holds **no Meta token by default**. Each Claude Code client sends `Authorization: Bearer <meta-token>` per request. Tokens never persist on the server.
 
-4. `mcp_meta_ads_get_campaigns`
-   - Get campaigns for a Meta Ads account with optional filtering
-   - Inputs:
-     - `access_token` (optional): Meta API access token (will use cached token if not provided)
-     - `account_id`: Meta Ads account ID (format: act_XXXXXXXXX)
-     - `limit`: Maximum number of campaigns to return (default: 10)
-     - `status_filter`: Filter by status (empty for all, or 'ACTIVE', 'PAUSED', etc.)
-   - Returns: List of campaigns matching the criteria
+### Deploy
 
-5. `mcp_meta_ads_get_campaign_details`
-   - Get detailed information about a specific campaign
-   - Inputs:
-     - `access_token` (optional): Meta API access token (will use cached token if not provided)
-     - `campaign_id`: Meta Ads campaign ID
-   - Returns: Detailed information about the specified campaign
+1. Push this repo to a git remote your Dokploy can reach.
+2. Create a Dokploy app → build type **Docker Compose** → compose path `docker-compose.yml`.
+3. Edit the `Host(...)` value in `docker-compose.yml` to your real domain.
+4. Confirm Dokploy's Traefik cert resolver name matches (default `letsencrypt`; some installs differ).
+5. Set env in Dokploy panel — minimum:
+   ```
+   META_ADS_MCP_WRITE=true
+   META_ADS_DISABLE_LOGIN_LINK=1
+   META_ADS_DISABLE_CALLBACK_SERVER=1
+   ```
+6. Deploy.
+7. Smoke-test:
+   ```bash
+   curl -X POST https://mcp.<your-domain>/meta \
+     -H "Content-Type: application/json" \
+     -H "Accept: application/json, text/event-stream" \
+     -H "Authorization: Bearer EAAB..." \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+   ```
+   Should return a JSON tool list.
 
-6. `mcp_meta_ads_create_campaign`
-   - Create a new campaign in a Meta Ads account
-   - Inputs:
-     - `access_token` (optional): Meta API access token (will use cached token if not provided)
-     - `account_id`: Meta Ads account ID (format: act_XXXXXXXXX)
-     - `name`: Campaign name
-     - `objective`: Campaign objective (ODAX, outcome-based). Must be one of:
-       - `OUTCOME_AWARENESS`
-       - `OUTCOME_TRAFFIC`
-       - `OUTCOME_ENGAGEMENT`
-       - `OUTCOME_LEADS`
-       - `OUTCOME_SALES`
-       - `OUTCOME_APP_PROMOTION`
+### Wire into Claude Code
 
-       Note: Legacy objectives such as `BRAND_AWARENESS`, `LINK_CLICKS`, `CONVERSIONS`, `APP_INSTALLS`, etc. are no longer valid for new campaigns and will cause a 400 error. Use the outcome-based values above. Common mappings:
-       - `BRAND_AWARENESS` → `OUTCOME_AWARENESS`
-       - `REACH` → `OUTCOME_AWARENESS`
-       - `LINK_CLICKS`, `TRAFFIC` → `OUTCOME_TRAFFIC`
-       - `POST_ENGAGEMENT`, `PAGE_LIKES`, `EVENT_RESPONSES`, `VIDEO_VIEWS` → `OUTCOME_ENGAGEMENT`
-       - `LEAD_GENERATION` → `OUTCOME_LEADS`
-       - `CONVERSIONS`, `CATALOG_SALES`, `MESSAGES` (sales-focused flows) → `OUTCOME_SALES`
-       - `APP_INSTALLS` → `OUTCOME_APP_PROMOTION`
-     - `status`: Initial campaign status (default: PAUSED)
-     - `special_ad_categories`: List of special ad categories if applicable
-     - `daily_budget`: Daily budget in account currency (in cents)
-     - `lifetime_budget`: Lifetime budget in account currency (in cents)
-     - `bid_strategy`: Bid strategy. Must be one of: `LOWEST_COST_WITHOUT_CAP`, `LOWEST_COST_WITH_BID_CAP`, `COST_CAP`, `LOWEST_COST_WITH_MIN_ROAS`.
-   - Returns: Confirmation with new campaign details
+```bash
+claude mcp add meta-ads --transport http https://mcp.<your-domain>/meta \
+  --header "Authorization: Bearer EAAB..."
+```
 
-   - Example:
-     ```json
-     {
-       "name": "2025 - Bedroom Furniture - Awareness",
-       "account_id": "act_123456789012345",
-       "objective": "OUTCOME_AWARENESS",
-       "special_ad_categories": [],
-       "status": "PAUSED",
-       "buying_type": "AUCTION",
-       "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
-       "daily_budget": 10000
-     }
-     ```
+### Run streamable-http directly (no Docker)
 
-7. `mcp_meta_ads_get_adsets`
-   - Get ad sets for a Meta Ads account with optional filtering by campaign
-   - Inputs:
-     - `access_token` (optional): Meta API access token (will use cached token if not provided)
-     - `account_id`: Meta Ads account ID (format: act_XXXXXXXXX)
-     - `limit`: Maximum number of ad sets to return (default: 10)
-     - `campaign_id`: Optional campaign ID to filter by
-   - Returns: List of ad sets matching the criteria
+```bash
+python -m meta_ads_mcp --transport streamable-http --host 0.0.0.0 --port 8080 --path /mcp
+```
 
-8. `mcp_meta_ads_get_adset_details`
-   - Get detailed information about a specific ad set
-   - Inputs:
-     - `access_token` (optional): Meta API access token (will use cached token if not provided)
-     - `adset_id`: Meta Ads ad set ID
-   - Returns: Detailed information about the specified ad set
+CLI flags: `--transport`, `--host`, `--port`, `--path`, `--sse-response`. `--path` also configurable via `MCP_HTTP_PATH` env.
 
-9. `mcp_meta_ads_create_adset`
-   - Create a new ad set in a Meta Ads account
-   - Inputs:
-     - `account_id`: Meta Ads account ID (format: act_XXXXXXXXX)
-     - `campaign_id`: Meta Ads campaign ID this ad set belongs to
-     - `name`: Ad set name
-     - `status`: Initial ad set status (default: PAUSED)
-     - `daily_budget`: Daily budget in account currency (in cents) as a string
-     - `lifetime_budget`: Lifetime budget in account currency (in cents) as a string
-     - `targeting`: Targeting specifications (e.g., age, location, interests)
-     - `optimization_goal`: Conversion optimization goal (e.g., 'LINK_CLICKS')
-     - `billing_event`: How you're charged (e.g., 'IMPRESSIONS')
-     - `bid_amount`: Bid amount in cents. Required for LOWEST_COST_WITH_BID_CAP, COST_CAP, TARGET_COST.
-     - `bid_strategy`: Bid strategy (e.g., 'LOWEST_COST_WITHOUT_CAP', 'LOWEST_COST_WITH_MIN_ROAS')
-     - `bid_constraints`: Bid constraints dict. Required for LOWEST_COST_WITH_MIN_ROAS (e.g., `{"roas_average_floor": 20000}`)
-     - `start_time`, `end_time`: Optional start/end times (ISO 8601)
-     - `access_token` (optional): Meta API access token
-   - Returns: Confirmation with new ad set details
+## Available Tools
 
-10. `mcp_meta_ads_get_ads`
-    - Get ads for a Meta Ads account with optional filtering
-    - Inputs:
-      - `access_token` (optional): Meta API access token (will use cached token if not provided)
-      - `account_id`: Meta Ads account ID (format: act_XXXXXXXXX)
-      - `limit`: Maximum number of ads to return (default: 10)
-      - `campaign_id`: Optional campaign ID to filter by
-      - `adset_id`: Optional ad set ID to filter by
-    - Returns: List of ads matching the criteria
+Discoverable via the standard MCP `tools/list` request. After connecting, ask your client to list tools or call `/mcp` in Claude Code.
 
-11. `mcp_meta_ads_create_ad`
-    - Create a new ad with an existing creative
-    - Inputs:
-      - `account_id`: Meta Ads account ID (format: act_XXXXXXXXX)
-      - `name`: Ad name
-      - `adset_id`: Ad set ID where this ad will be placed
-      - `creative_id`: ID of an existing creative to use
-      - `status`: Initial ad status (default: PAUSED)
-      - `bid_amount`: Optional bid amount (in cents)
-      - `tracking_specs`: Optional tracking specifications
-      - `access_token` (optional): Meta API access token
-    - Returns: Confirmation with new ad details
+Read tools (default): account / campaign / adset / ad / creative / insights getters, interest+demographic+geo search, ads library search.
 
-12. `mcp_meta_ads_get_ad_details`
-    - Get detailed information about a specific ad
-    - Inputs:
-      - `access_token` (optional): Meta API access token (will use cached token if not provided)
-      - `ad_id`: Meta Ads ad ID
-    - Returns: Detailed information about the specified ad
+Write tools (require `META_ADS_MCP_WRITE=true`): `create_campaign`, `create_adset`, `create_ad`, `create_ad_creative`, `create_budget_schedule`, `update_campaign`, `update_adset`, `update_ad`, `update_ad_creative`, `upload_ad_image`.
 
-13. `mcp_meta_ads_get_ad_creatives`
-    - Get creative details for a specific ad
-    - Inputs:
-      - `access_token` (optional): Meta API access token (will use cached token if not provided)
-      - `ad_id`: Meta Ads ad ID
-    - Returns: Creative details including text, images, and URLs
-
-14. `mcp_meta_ads_create_ad_creative`
-    - Create a new ad creative using an uploaded image hash
-    - Inputs:
-      - `account_id`: Meta Ads account ID (format: act_XXXXXXXXX)
-      - `name`: Creative name
-      - `image_hash`: Hash of the uploaded image
-      - `page_id`: Facebook Page ID for the ad
-      - `link_url`: Destination URL
-      - `message`: Ad copy/text
-      - `headline`: Single headline for simple ads (cannot be used with headlines)
-      - `headlines`: List of headlines for dynamic creative testing (cannot be used with headline)
-      - `description`: Single description for simple ads (cannot be used with descriptions)
-      - `descriptions`: List of descriptions for dynamic creative testing (cannot be used with description)
-      - `dynamic_creative_spec`: Dynamic creative optimization settings
-      - `call_to_action_type`: CTA button type (e.g., 'LEARN_MORE')
-      - `instagram_actor_id`: Optional Instagram account ID
-      - `access_token` (optional): Meta API access token
-    - Returns: Confirmation with new creative details
-
-15. `mcp_meta_ads_update_ad_creative`
-    - Update an existing ad creative with new content or settings
-    - Inputs:
-      - `creative_id`: Meta Ads creative ID to update
-      - `name`: New creative name
-      - `message`: New ad copy/text
-      - `headline`: Single headline for simple ads (cannot be used with headlines)
-      - `headlines`: New list of headlines for dynamic creative testing (cannot be used with headline)
-      - `description`: Single description for simple ads (cannot be used with descriptions)
-      - `descriptions`: New list of descriptions for dynamic creative testing (cannot be used with description)
-      - `dynamic_creative_spec`: New dynamic creative optimization settings
-      - `call_to_action_type`: New call to action button type
-      - `access_token` (optional): Meta API access token (will use cached token if not provided)
-    - Returns: Confirmation with updated creative details
-
-16. `mcp_meta_ads_upload_ad_image`
-    - Upload an image to use in Meta Ads creatives
-    - Inputs:
-      - `account_id`: Meta Ads account ID (format: act_XXXXXXXXX)
-      - `image_path`: Path to the image file to upload
-      - `name`: Optional name for the image
-      - `access_token` (optional): Meta API access token
-    - Returns: JSON response with image details including hash
-
-17. `mcp_meta_ads_get_ad_image`
-    - Get, download, and visualize a Meta ad image in one step
-    - Inputs:
-      - `access_token` (optional): Meta API access token (will use cached token if not provided)
-      - `ad_id`: Meta Ads ad ID
-    - Returns: The ad image ready for direct visual analysis
-
-18. `mcp_meta_ads_update_ad`
-    - Update an ad with new settings
-    - Inputs:
-      - `ad_id`: Meta Ads ad ID
-      - `status`: Update ad status (ACTIVE, PAUSED, etc.)
-      - `bid_amount`: Bid amount in account currency (in cents for USD)
-      - `access_token` (optional): Meta API access token (will use cached token if not provided)
-    - Returns: Confirmation with updated ad details and a confirmation link
-
-19. `mcp_meta_ads_update_adset`
-    - Update an ad set with new settings including frequency caps
-    - Inputs:
-      - `adset_id`: Meta Ads ad set ID
-      - `frequency_control_specs`: List of frequency control specifications
-      - `bid_strategy`: Bid strategy (e.g., 'LOWEST_COST_WITH_BID_CAP', 'LOWEST_COST_WITH_MIN_ROAS')
-      - `bid_amount`: Bid amount in cents. Required for LOWEST_COST_WITH_BID_CAP, COST_CAP, TARGET_COST.
-      - `bid_constraints`: Bid constraints dict. Required for LOWEST_COST_WITH_MIN_ROAS (e.g., `{"roas_average_floor": 20000}`)
-      - `status`: Update ad set status (ACTIVE, PAUSED, etc.)
-      - `targeting`: Targeting specifications including targeting_automation
-      - `access_token` (optional): Meta API access token (will use cached token if not provided)
-    - Returns: Confirmation with updated ad set details and a confirmation link
-
-20. `mcp_meta_ads_get_insights`
-    - Get performance insights for a campaign, ad set, ad or account
-    - Inputs:
-      - `access_token` (optional): Meta API access token (will use cached token if not provided)
-      - `object_id`: ID of the campaign, ad set, ad or account
-      - `time_range`: Time range for insights (default: maximum)
-      - `breakdown`: Optional breakdown dimension (e.g., age, gender, country)
-      - `level`: Level of aggregation (ad, adset, campaign, account)
-      - `action_attribution_windows` (optional): List of attribution windows for conversion data (e.g., ["1d_click", "1d_view", "7d_click", "7d_view"]). When specified, actions and cost_per_action_type include additional fields for each window. The 'value' field always shows 7d_click attribution.
-    - Returns: Performance metrics for the specified object
-
-21. `mcp_meta_ads_get_login_link`
-    - Get a clickable login link for Meta Ads authentication
-    - Inputs:
-      - `access_token` (optional): Meta API access token (will use cached token if not provided)
-    - Returns: A clickable resource link for Meta authentication
-
-22. `mcp_meta_ads_create_budget_schedule`
-    - Create a budget schedule for a Meta Ads campaign
-    - Inputs:
-      - `campaign_id`: Meta Ads campaign ID
-      - `budget_value`: Amount of budget increase
-      - `budget_value_type`: Type of budget value ("ABSOLUTE" or "MULTIPLIER")
-      - `time_start`: Unix timestamp for when the high demand period should start
-      - `time_end`: Unix timestamp for when the high demand period should end
-      - `access_token` (optional): Meta API access token
-    - Returns: JSON string with the ID of the created budget schedule or an error message
-
-23. `mcp_meta_ads_search_interests`
-    - Search for interest targeting options by keyword
-    - Inputs:
-      - `access_token` (optional): Meta API access token (will use cached token if not provided)
-      - `query`: Search term for interests (e.g., "baseball", "cooking", "travel")
-      - `limit`: Maximum number of results to return (default: 25)
-    - Returns: Interest data with id, name, audience_size, and path fields
-
-24. `mcp_meta_ads_get_interest_suggestions`
-    - Get interest suggestions based on existing interests
-    - Inputs:
-      - `access_token` (optional): Meta API access token (will use cached token if not provided)
-      - `interest_list`: List of interest names to get suggestions for (e.g., ["Basketball", "Soccer"])
-      - `limit`: Maximum number of suggestions to return (default: 25)
-    - Returns: Suggested interests with id, name, audience_size, and description fields
-
-25. `mcp_meta_ads_validate_interests`
-    - Validate interest names or IDs for targeting
-    - Inputs:
-      - `access_token` (optional): Meta API access token (will use cached token if not provided)
-      - `interest_list`: List of interest names to validate (e.g., ["Japan", "Basketball"])
-      - `interest_fbid_list`: List of interest IDs to validate (e.g., ["6003700426513"])
-    - Returns: Validation results showing valid status and audience_size for each interest
-
-26. `mcp_meta_ads_search_behaviors`
-    - Get all available behavior targeting options
-    - Inputs:
-      - `access_token` (optional): Meta API access token (will use cached token if not provided)
-      - `limit`: Maximum number of results to return (default: 50)
-    - Returns: Behavior targeting options with id, name, audience_size bounds, path, and description
-
-27. `mcp_meta_ads_search_demographics`
-    - Get demographic targeting options
-    - Inputs:
-      - `access_token` (optional): Meta API access token (will use cached token if not provided)
-      - `demographic_class`: Type of demographics ('demographics', 'life_events', 'industries', 'income', 'family_statuses', 'user_device', 'user_os')
-      - `limit`: Maximum number of results to return (default: 50)
-    - Returns: Demographic targeting options with id, name, audience_size bounds, path, and description
-
-28. `mcp_meta_ads_search_geo_locations`
-    - Search for geographic targeting locations
-    - Inputs:
-      - `access_token` (optional): Meta API access token (will use cached token if not provided)
-      - `query`: Search term for locations (e.g., "New York", "California", "Japan")
-      - `location_types`: Types of locations to search (['country', 'region', 'city', 'zip', 'geo_market', 'electoral_district'])
-      - `limit`: Maximum number of results to return (default: 25)
-    - Returns: Location data with key, name, type, and geographic hierarchy information
-
-29. `mcp_meta_ads_search` (Enhanced)
-    - Generic search across accounts, campaigns, ads, and pages
-    - Automatically includes page searching when query mentions "page" or "pages"
-    - Inputs:
-      - `access_token` (optional): Meta API access token (will use cached token if not provided)
-      - `query`: Search query string (e.g., "Injury Payouts pages", "active campaigns")
-    - Returns: List of matching record IDs in ChatGPT-compatible format
-
-## Licensing
-
-Meta Ads MCP is licensed under the [Business Source License 1.1](LICENSE), which means:
-
-- **Free to use** for individual and business purposes
-- **Modify and customize** as needed
-- **Redistribute** to others
-- **Becomes fully open source** (Apache 2.0) on January 1, 2029
-
-The only restriction is that you cannot offer this as a competing hosted service.
-
-## Privacy and Security
-
-Meta Ads MCP follows security best practices with secure token management and automatic authentication handling.
-
-- Tokens provided via `META_ACCESS_TOKEN` are kept in your process environment only (consider sourcing them from your OS keychain at startup).
-- Tokens obtained via the local OAuth flow are cached on disk under the platform-specific config directory; delete the cache file to force re-authentication.
-- No token material leaves your machine except in outbound calls to Meta's own Graph API.
+The full canonical list is enforced by [`meta_ads_mcp/core/write_gate.py`](meta_ads_mcp/core/write_gate.py); a drift-alarm test (`tests/test_write_gate.py::test_every_registered_tool_is_classified`) fails CI if a new tool is registered without classification.
 
 ## Testing
 
-Test your Meta Ads MCP connection with any MCP client:
-
-1. **Verify Account Access**: Ask your LLM to use `mcp_meta_ads_get_ad_accounts`
-2. **Check Account Details**: Use `mcp_meta_ads_get_account_info` with your account ID
-3. **List Campaigns**: Try `mcp_meta_ads_get_campaigns` to see your ad campaigns
-
-Run the test suite:
-
 ```bash
+pip install -e '.[dev]'
 pytest -q
 ```
 
+448+ tests, ~90 s. End-to-end tests (`*_e2e.py`) are excluded by default and require a real Meta access token — opt in with `pytest -m e2e`.
+
+## Licensing
+
+[Business Source License 1.1](LICENSE) — Licensor: ARTELL SOLUÇÕES TECNOLÓGICAS LTDA.
+
+- Use freely for individual and business purposes.
+- Modify and customize.
+- Redistribute.
+- Cannot host as a service that competes with the Licensor's commercial offering.
+- Auto-converts to Apache 2.0 on **2029-01-01**.
+
+## Privacy and Security
+
+- `META_ACCESS_TOKEN` lives in the process environment only.
+- OAuth-obtained tokens cache to disk (paths above) as plain JSON. Delete the file to invalidate.
+- HTTP-mode Bearer tokens are scoped to the request via Python `contextvars` — never persisted, never logged.
+- No token material leaves your machine except in outbound calls to Meta's Graph API.
+
 ## Troubleshooting
 
-- **"Authentication Required" errors**: Confirm one of `META_ACCESS_TOKEN` or `META_APP_ID` (+ `META_APP_SECRET` for long-lived tokens) is set in the environment the MCP server sees. Claude Desktop, Cursor, and other MCP clients use the environment they spawn the command in — restart the client after changing env vars.
-- **OAuth callback times out**: The default local callback URL is `http://localhost:<port>/callback`. If you've set `META_ADS_DISABLE_CALLBACK_SERVER`, only direct-token auth (`META_ACCESS_TOKEN`) will work.
-- **Cache file corrupt**: Remove the cached token file (`~/Library/Application Support/meta-ads-mcp/token_cache.json` on macOS) and re-run the login flow.
+- **`Authentication Required`**: confirm `META_ACCESS_TOKEN` (or `META_APP_ID` + `META_APP_SECRET`) is set in the environment the server actually sees. Restart Claude Code after env changes.
+- **Write tool missing from `tools/list`**: `META_ADS_MCP_WRITE` is unset or not truthy. Set to `true`/`1`/`yes`.
+- **Hosted: 404 on `/meta`**: PathPrefix collision or label conflict between hand-written compose labels and Dokploy-generated labels. Pick one source of truth.
+- **Hosted: 502**: container crashed or wrong service port. Check `docker logs <container>` and the Traefik service `loadbalancer.server.port=8080` label.
+- **Hosted: TLS handshake fails**: cert resolver name in compose doesn't match Dokploy's Traefik config. Check `docker exec dokploy-traefik cat /etc/dokploy/traefik/traefik.yml`.
+- **Cache file corrupt**: remove the cached token file and re-run `--login`.
