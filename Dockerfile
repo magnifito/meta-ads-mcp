@@ -1,25 +1,34 @@
 FROM python:3.11-slim
 
-# Install system dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc && \
-    rm -rf /var/lib/apt/lists/*
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    MCP_HTTP_PATH=/meta
 
-# Set working directory
 WORKDIR /app
 
-# Install uv
-RUN pip install --upgrade pip && \
-    pip install uv
+# Pillow runtime deps
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libjpeg62-turbo zlib1g \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements file
-COPY requirements.txt .
+COPY pyproject.toml README.md ./
+COPY meta_ads_mcp ./meta_ads_mcp
 
-# Install dependencies using uv with --system flag
-RUN uv pip install --system -r requirements.txt
+RUN pip install --upgrade pip \
+    && pip install .
 
-# Copy the rest of the application
-COPY . .
+# Drop privileges
+RUN useradd --system --uid 1001 --home /home/mcp mcp \
+    && mkdir -p /home/mcp/.config/meta-ads-mcp \
+    && chown -R mcp:mcp /home/mcp /app
+USER mcp
 
-# Command to run the Meta Ads MCP server
-CMD ["python", "-m", "meta_ads_mcp"] 
+EXPOSE 8080
+
+# Streamable HTTP, mount path set via MCP_HTTP_PATH (default /meta).
+# Override write mode etc. via env at runtime.
+CMD ["python", "-m", "meta_ads_mcp", \
+     "--transport", "streamable-http", \
+     "--host", "0.0.0.0", \
+     "--port", "8080"]

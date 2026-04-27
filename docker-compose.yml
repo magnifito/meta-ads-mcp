@@ -1,0 +1,35 @@
+# Dokploy + Traefik deployment for mcp.magnifito.com/meta
+#
+# Multi-tenant: server holds no Meta token by default. Each Claude Code client
+# sends `Authorization: Bearer <meta-token>` per request.
+#
+# Set META_ADS_MCP_WRITE=true to enable create/update/upload tools server-wide.
+
+services:
+  meta-ads-mcp:
+    build: .
+    image: meta-ads-mcp:latest
+    restart: unless-stopped
+    environment:
+      MCP_HTTP_PATH: /meta
+      META_ADS_MCP_WRITE: ${META_ADS_MCP_WRITE:-false}
+      # Optional server-wide fallbacks (leave unset for pure multi-tenant):
+      # META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
+      # META_APP_SECRET:   ${META_APP_SECRET:-}
+      # META_ADS_BM_IDS:   ${META_ADS_BM_IDS:-}
+    networks:
+      - dokploy-network
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      # Router: mcp.magnifito.com/meta*
+      - traefik.http.routers.meta-ads-mcp.rule=Host(`mcp.magnifito.com`) && PathPrefix(`/meta`)
+      - traefik.http.routers.meta-ads-mcp.entrypoints=websecure
+      - traefik.http.routers.meta-ads-mcp.tls=true
+      - traefik.http.routers.meta-ads-mcp.tls.certresolver=letsencrypt
+      # Service points at internal :8080
+      - traefik.http.services.meta-ads-mcp.loadbalancer.server.port=8080
+
+networks:
+  dokploy-network:
+    external: true

@@ -224,6 +224,12 @@ def main():
         action="store_true",
         help="Use SSE response format instead of JSON (default: JSON, only used with --transport streamable-http)",
     )
+    parser.add_argument(
+        "--path",
+        type=str,
+        default=os.environ.get("MCP_HTTP_PATH", "/mcp"),
+        help="Mount path for Streamable HTTP transport (default: /mcp). Also configurable via MCP_HTTP_PATH env var.",
+    )
 
     args = parser.parse_args()
     logger.debug(f"Parsed args: login={args.login}, app_id={args.app_id}, version={args.version}")
@@ -305,6 +311,7 @@ def main():
         mcp_server.settings.port = args.port
         mcp_server.settings.stateless_http = True
         mcp_server.settings.json_response = not args.sse_response
+        mcp_server.settings.streamable_http_path = args.path
 
         # Import all tool modules to ensure they are registered
         logger.info("Ensuring all tools are registered for HTTP transport")
