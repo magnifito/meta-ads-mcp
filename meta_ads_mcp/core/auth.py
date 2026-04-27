@@ -9,7 +9,7 @@ import time
 import webbrowser
 from typing import Any
 
-import requests
+import httpx
 
 # Import from the new callback server module
 from .callback_server import start_callback_server, token_container
@@ -393,7 +393,7 @@ def exchange_token_for_long_lived(short_lived_token):
         }
 
         logger.debug(f"Making token exchange request to {url}")
-        response = requests.get(url, params=params)
+        response = httpx.get(url, params=params, timeout=30.0)
 
         if response.status_code == 200:
             data = response.json()
