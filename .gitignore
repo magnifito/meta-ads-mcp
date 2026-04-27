@@ -31,3 +31,8 @@ debug/
 
 internal/
 uv.lock
+
+# Local env (use .env.example as template)
+.env
+.env.*
+!.env.example
