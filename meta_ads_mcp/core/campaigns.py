@@ -1,31 +1,31 @@
 """Campaign-related functionality for Meta Ads API."""
 
 import json
-from typing import List, Optional, Dict, Any, Union
-from .api import meta_api_tool, make_api_request, ensure_act_prefix
-from .accounts import get_ad_accounts
+from typing import Any
+
+from .api import ensure_act_prefix, make_api_request, meta_api_tool
 from .server import mcp_server
 
 
 @mcp_server.tool()
 @meta_api_tool
 async def get_campaigns(
-    account_id: str, 
-    access_token: Optional[str] = None, 
-    limit: int = 10, 
-    status_filter: str = "", 
-    objective_filter: Union[str, List[str]] = "", 
-    after: str = ""
+    account_id: str,
+    access_token: str | None = None,
+    limit: int = 10,
+    status_filter: str = "",
+    objective_filter: str | list[str] = "",
+    after: str = "",
 ) -> str:
     """
     Get campaigns for a Meta Ads account with optional filtering.
-    
-    Note: By default, the Meta API returns a subset of available fields. 
+
+    Note: By default, the Meta API returns a subset of available fields.
     Other fields like 'effective_status', 'spend_cap', 'budget_remaining',
     'promoted_object', 'source_campaign_id', etc., might be available but
     require specifying them in the API call (currently not exposed by this
     tool's parameters).
-    
+
     Args:
         account_id: Meta Ads account ID (format: act_XXXXXXXXX)
         access_token: Meta API access token (optional - will use cached token if not provided)
@@ -48,67 +48,63 @@ async def get_campaigns(
     endpoint = f"{account_id}/campaigns"
     params = {
         "fields": "id,name,objective,status,daily_budget,lifetime_budget,buying_type,start_time,stop_time,created_time,updated_time,bid_strategy,special_ad_categories",
-        "limit": limit
+        "limit": limit,
     }
-    
+
     # Build filtering array for complex filtering
     filters = []
-    
+
     if status_filter:
         # API expects an array, encode it as a JSON string
         params["effective_status"] = json.dumps([status_filter])
-    
+
     # Handle objective filtering - supports both single string and list of objectives
     if objective_filter:
         # Convert single string to list for consistent handling
         objectives = [objective_filter] if isinstance(objective_filter, str) else objective_filter
-        
+
         # Filter out empty strings
         objectives = [obj for obj in objectives if obj]
-        
+
         if objectives:
-            filters.append({
-                "field": "objective",
-                "operator": "IN",
-                "value": objectives
-            })
-    
+            filters.append({"field": "objective", "operator": "IN", "value": objectives})
+
     # Add filtering parameter if we have filters
     if filters:
         params["filtering"] = json.dumps(filters)
-    
+
     if after:
         params["after"] = after
-    
+
     data = await make_api_request(endpoint, access_token, params)
-    
+
     return json.dumps(data, indent=2)
 
 
 @mcp_server.tool()
 @meta_api_tool
-async def get_campaign_details(campaign_id: str, access_token: Optional[str] = None) -> str:
+async def get_campaign_details(campaign_id: str, access_token: str | None = None) -> str:
     """
     Get detailed information about a specific campaign.
 
-    Note: This function requests a specific set of fields ('id,name,objective,status,...'). 
-    The Meta API offers many other fields for campaigns (e.g., 'effective_status', 'source_campaign_id', etc.) 
+    Note: This function requests a specific set of fields ('id,name,objective,status,...').
+    The Meta API offers many other fields for campaigns (e.g., 'effective_status', 'source_campaign_id', etc.)
     that could be added to the 'fields' parameter in the code if needed.
-    
+
     Args:
         campaign_id: Meta Ads campaign ID
         access_token: Meta API access token (optional - will use cached token if not provided)
     """
     if not campaign_id:
         return json.dumps({"error": "No campaign ID provided"}, indent=2)
-    
+
     endpoint = f"{campaign_id}"
     params = {
         "fields": "id,name,objective,status,daily_budget,lifetime_budget,buying_type,start_time,stop_time,created_time,updated_time,bid_strategy,special_ad_categories,special_ad_category_country,budget_remaining,configured_status"
     }
-    
+
     data = await make_api_request(endpoint, access_token, params)
-    
+
     return json.dumps(data, indent=2)
 
 
@@ -118,18 +114,18 @@ async def create_campaign(
     account_id: str,
     name: str,
     objective: str,
-    access_token: Optional[str] = None,
+    access_token: str | None = None,
     status: str = "PAUSED",
-    special_ad_categories: Optional[List[str]] = None,
-    daily_budget: Optional[int] = None,
-    lifetime_budget: Optional[int] = None,
-    buying_type: Optional[str] = None,
+    special_ad_categories: list[str] | None = None,
+    daily_budget: int | None = None,
+    lifetime_budget: int | None = None,
+    buying_type: str | None = None,
     bid_strategy: str = "LOWEST_COST_WITHOUT_CAP",
-    bid_cap: Optional[int] = None,
-    spend_cap: Optional[int] = None,
-    campaign_budget_optimization: Optional[bool] = None,
-    ab_test_control_setups: Optional[List[Dict[str, Any]]] = None,
-    use_adset_level_budgets: bool = False
+    bid_cap: int | None = None,
+    spend_cap: int | None = None,
+    campaign_budget_optimization: bool | None = None,
+    ab_test_control_setups: list[dict[str, Any]] | None = None,
+    use_adset_level_budgets: bool = False,
 ) -> str:
     """
     Create a new campaign in a Meta Ads account.
@@ -162,10 +158,10 @@ async def create_campaign(
     # Check required parameters
     if not account_id:
         return json.dumps({"error": "No account ID provided"}, indent=2)
-    
+
     if not name:
         return json.dumps({"error": "No campaign name provided"}, indent=2)
-        
+
     if not objective:
         return json.dumps({"error": "No campaign objective provided"}, indent=2)
 
@@ -173,11 +169,11 @@ async def create_campaign(
 
     # Track whether the user explicitly provided special_ad_categories
     _user_provided_categories = special_ad_categories is not None
-    
+
     # Special_ad_categories is required by the API, set default if not provided
     if special_ad_categories is None:
         special_ad_categories = []
-    
+
     # Only warn if user omitted special_ad_categories entirely.
     # If they explicitly passed [] they are saying none are needed.
     compliance_warning = None
@@ -188,20 +184,20 @@ async def create_campaign(
             "you must set special_ad_categories (e.g., FINANCIAL_PRODUCTS_SERVICES, HOUSING, EMPLOYMENT, CREDIT) "
             "to comply with Meta advertising policies. Ads without the correct category may be rejected."
         )
-    
+
     # For this example, we'll add a fixed daily budget if none is provided and we're not using ad set level budgets
     if not daily_budget and not lifetime_budget and not use_adset_level_budgets:
         daily_budget = "1000"  # Default to $10 USD
-    
+
     endpoint = f"{account_id}/campaigns"
-    
+
     params = {
         "name": name,
         "objective": objective,
         "status": status,
-        "special_ad_categories": json.dumps(special_ad_categories)  # Properly format as JSON string
+        "special_ad_categories": json.dumps(special_ad_categories),  # Properly format as JSON string
     }
-    
+
     # Only set campaign-level budgets if we're not using ad set level budgets
     if not use_adset_level_budgets:
         # Convert budget values to strings if they aren't already
@@ -220,56 +216,54 @@ async def create_campaign(
     # Add new parameters
     if buying_type:
         params["buying_type"] = buying_type
-    
+
     if bid_strategy and not use_adset_level_budgets:
         params["bid_strategy"] = bid_strategy
-    
+
     if bid_cap is not None:
         params["bid_cap"] = str(bid_cap)
-    
+
     if spend_cap is not None:
         params["spend_cap"] = str(spend_cap)
-    
+
     if ab_test_control_setups:
         params["ab_test_control_setups"] = json.dumps(ab_test_control_setups)
-    
+
     try:
         data = await make_api_request(endpoint, access_token, params, method="POST")
-        
+
         # Add a note about budget strategy if using ad set level budgets
         if use_adset_level_budgets:
             data["budget_strategy"] = "ad_set_level"
-            data["note"] = "Campaign created with ad set level budgets. Set budgets when creating ad sets within this campaign."
-        
+            data["note"] = (
+                "Campaign created with ad set level budgets. Set budgets when creating ad sets within this campaign."
+            )
+
         if compliance_warning:
             data["compliance_warning"] = compliance_warning
-        
+
         return json.dumps(data, indent=2)
     except Exception as e:
         error_msg = str(e)
-        return json.dumps({
-            "error": "Failed to create campaign",
-            "details": error_msg,
-            "params_sent": params
-        }, indent=2)
+        return json.dumps({"error": "Failed to create campaign", "details": error_msg, "params_sent": params}, indent=2)
 
 
 @mcp_server.tool()
 @meta_api_tool
 async def update_campaign(
     campaign_id: str,
-    access_token: Optional[str] = None,
-    name: Optional[str] = None,
-    status: Optional[str] = None,
-    special_ad_categories: Optional[List[str]] = None,
-    daily_budget: Optional[int] = None,
-    lifetime_budget: Optional[int] = None,
-    bid_strategy: Optional[str] = None,
-    bid_cap: Optional[int] = None,
-    spend_cap: Optional[int] = None,
-    campaign_budget_optimization: Optional[bool] = None,
-    objective: Optional[str] = None,  # Add objective if it's updatable
-    use_adset_level_budgets: Optional[bool] = None,  # Add other updatable fields as needed based on API docs
+    access_token: str | None = None,
+    name: str | None = None,
+    status: str | None = None,
+    special_ad_categories: list[str] | None = None,
+    daily_budget: int | None = None,
+    lifetime_budget: int | None = None,
+    bid_strategy: str | None = None,
+    bid_cap: int | None = None,
+    spend_cap: int | None = None,
+    campaign_budget_optimization: bool | None = None,
+    objective: str | None = None,  # Add objective if it's updatable
+    use_adset_level_budgets: bool | None = None,  # Add other updatable fields as needed based on API docs
 ) -> str:
     """
     Update an existing campaign in a Meta Ads account.
@@ -282,7 +276,7 @@ async def update_campaign(
         name: New campaign name
         status: New campaign status (e.g., 'ACTIVE', 'PAUSED')
         special_ad_categories: List of special ad categories if applicable
-        daily_budget: New daily budget in account currency (in cents) as a string. 
+        daily_budget: New daily budget in account currency (in cents) as a string.
                      Set to empty string "" to remove the daily budget.
         lifetime_budget: New lifetime budget in account currency (in cents) as a string.
                         Set to empty string "" to remove the lifetime budget.
@@ -297,9 +291,9 @@ async def update_campaign(
         return json.dumps({"error": "No campaign ID provided"}, indent=2)
 
     endpoint = f"{campaign_id}"
-    
+
     params = {}
-    
+
     # Add parameters to the request only if they are provided
     if name is not None:
         params["name"] = name
@@ -309,7 +303,7 @@ async def update_campaign(
         # Note: Updating special_ad_categories might have specific API rules or might not be allowed after creation.
         # The API might require an empty list `[]` to clear categories. Check Meta Docs.
         params["special_ad_categories"] = json.dumps(special_ad_categories)
-    
+
     # Handle budget parameters based on use_adset_level_budgets setting
     if use_adset_level_budgets is not None:
         if use_adset_level_budgets:
@@ -348,7 +342,7 @@ async def update_campaign(
                 params["lifetime_budget"] = str(lifetime_budget)
         if campaign_budget_optimization is not None:
             params["campaign_budget_optimization"] = "true" if campaign_budget_optimization else "false"
-    
+
     if bid_strategy is not None:
         params["bid_strategy"] = bid_strategy
     if bid_cap is not None:
@@ -356,7 +350,7 @@ async def update_campaign(
     if spend_cap is not None:
         params["spend_cap"] = str(spend_cap)
     if objective is not None:
-        params["objective"] = objective # Caution: Objective changes might reset learning or be restricted
+        params["objective"] = objective  # Caution: Objective changes might reset learning or be restricted
 
     if not params:
         return json.dumps({"error": "No update parameters provided"}, indent=2)
@@ -364,18 +358,23 @@ async def update_campaign(
     try:
         # Use POST method for updates as per Meta API documentation
         data = await make_api_request(endpoint, access_token, params, method="POST")
-        
+
         # Add a note about budget strategy if switching to ad set level budgets
         if use_adset_level_budgets is not None and use_adset_level_budgets:
             data["budget_strategy"] = "ad_set_level"
-            data["note"] = "Campaign updated to use ad set level budgets. Set budgets when creating ad sets within this campaign."
-        
+            data["note"] = (
+                "Campaign updated to use ad set level budgets. Set budgets when creating ad sets within this campaign."
+            )
+
         return json.dumps(data, indent=2)
     except Exception as e:
         error_msg = str(e)
         # Include campaign_id in error for better context
-        return json.dumps({
-            "error": f"Failed to update campaign {campaign_id}",
-            "details": error_msg,
-            "params_sent": params # Be careful about logging sensitive data if any
-        }, indent=2) 
+        return json.dumps(
+            {
+                "error": f"Failed to update campaign {campaign_id}",
+                "details": error_msg,
+                "params_sent": params,  # Be careful about logging sensitive data if any
+            },
+            indent=2,
+        )

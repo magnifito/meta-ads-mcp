@@ -30,9 +30,6 @@ dependencies = [
     "pytest-asyncio>=1.0.0",
 ]
 
-[project.urls]
-"Upstream Fork" = "https://github.com/pipeboard-co/meta-ads-mcp"
-
 [project.scripts]
 meta-ads-mcp = "meta_ads_mcp:entrypoint"
 
@@ -46,3 +43,38 @@ markers = [
 addopts = "-v --strict-markers -m 'not e2e'"
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = [".venv", "build", "dist"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter where possible)
+    "B008",   # function calls in argument defaults (FastMCP idiom)
+    "SIM108", # ternary instead of if/else (often less readable)
+    "SIM117", # nested with → combined with (high-churn, low-value)
+    "B904",   # raise from inside except (noisy in this codebase)
+    "UP035",  # typing.Dict / typing.List deprecated (codebase uses heavily)
+    "UP006",  # use-pep585-annotation (same reason)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402", "F401", "F811", "E722", "B007", "F841", "B023", "SIM102"]
+"examples/*" = ["E722", "F841"]
+"meta_ads_mcp/__init__.py" = ["F401", "F811"]
+"meta_ads_mcp/core/__init__.py" = ["F401"]
+"meta_ads_mcp/core/ads.py" = ["E402"]  # late imports break a circular dep w/ .server
+"meta_ads_mcp/core/api.py" = ["SIM102"]  # nested if reads better here
+"meta_ads_mcp/core/http_auth_integration.py" = ["E402", "F811"]  # late imports + duplicated symbol intentional in patcher
+"meta_ads_mcp/core/resilience.py" = ["SIM102"]

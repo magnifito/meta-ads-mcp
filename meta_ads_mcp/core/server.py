@@ -1,13 +1,14 @@
 """MCP server configuration for Meta Ads API."""
 
-from mcp.server.fastmcp import FastMCP
 import argparse
 import os
 import sys
-import json
-from typing import Dict, Any, Optional
+from typing import Any
+
+from mcp.server.fastmcp import FastMCP
+
 from .auth import login as login_auth
-from .resources import list_resources, get_resource
+from .resources import get_resource, list_resources
 from .utils import logger
 from .write_gate import install_write_gate, is_write_enabled
 
@@ -21,18 +22,18 @@ mcp_server.resource(uri="meta-ads://images/{resource_id}")(get_resource)
 
 class StreamableHTTPHandler:
     """Handles stateless Streamable HTTP requests for Meta Ads MCP"""
-    
+
     def __init__(self):
         """Initialize handler with no session storage - all auth per request"""
         logger.debug("StreamableHTTPHandler initialized for stateless operation")
-        
-    def handle_request(self, request_headers: Dict[str, str], request_body: Dict[str, Any]) -> Dict[str, Any]:
+
+    def handle_request(self, request_headers: dict[str, str], request_body: dict[str, Any]) -> dict[str, Any]:
         """Handle individual request with authentication
-        
+
         Args:
             request_headers: HTTP request headers
             request_body: JSON-RPC request body
-            
+
         Returns:
             JSON response with auth status and any tool results
         """
@@ -40,147 +41,135 @@ class StreamableHTTPHandler:
             # Extract authentication configuration from headers
             auth_config = self.get_auth_config_from_headers(request_headers)
             logger.debug(f"Auth method detected: {auth_config['auth_method']}")
-            
+
             # Handle based on auth method
-            if auth_config['auth_method'] == 'bearer':
+            if auth_config["auth_method"] == "bearer":
                 return self.handle_bearer_request(auth_config, request_body)
-            elif auth_config['auth_method'] == 'custom_meta_app':
+            elif auth_config["auth_method"] == "custom_meta_app":
                 return self.handle_custom_app_request(auth_config, request_body)
             else:
                 return self.handle_unauthenticated_request(request_body)
-                
+
         except Exception as e:
             logger.error(f"Error handling request: {e}")
             return {
-                'jsonrpc': '2.0',
-                'error': {
-                    'code': -32603,
-                    'message': 'Internal error',
-                    'data': str(e)
-                },
-                'id': request_body.get('id')
+                "jsonrpc": "2.0",
+                "error": {"code": -32603, "message": "Internal error", "data": str(e)},
+                "id": request_body.get("id"),
             }
-    
-    def get_auth_config_from_headers(self, request_headers: Dict[str, str]) -> Dict[str, Any]:
+
+    def get_auth_config_from_headers(self, request_headers: dict[str, str]) -> dict[str, Any]:
         """Extract authentication configuration from HTTP headers
-        
+
         Args:
             request_headers: HTTP request headers
-            
+
         Returns:
             Dictionary with auth method and relevant credentials
         """
         # Security validation - only allow safe headers
-        ALLOWED_VIA_HEADERS = {
-            'meta_app_id': True,           # Fallback only - triggers OAuth complexity
-            'meta_app_secret': False,      # Server environment only
-            'meta_access_token': False,    # Use proper auth flows instead
-        }
-        
+
         # PRIMARY: Check for Bearer token in Authorization header (handles 90%+ of cases)
-        auth_header = request_headers.get('Authorization') or request_headers.get('authorization')
-        if auth_header and auth_header.lower().startswith('bearer '):
+        auth_header = request_headers.get("Authorization") or request_headers.get("authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
             token = auth_header[7:].strip()
             logger.info("Bearer authentication detected (primary path)")
             return {
-                'auth_method': 'bearer',
-                'bearer_token': token,
-                'requires_oauth': False  # Simple token-based auth
+                "auth_method": "bearer",
+                "bearer_token": token,
+                "requires_oauth": False,  # Simple token-based auth
             }
-        
+
         # FALLBACK: Custom Meta app (minority of users)
-        meta_app_id = request_headers.get('X-META-APP-ID') or request_headers.get('x-meta-app-id')
+        meta_app_id = request_headers.get("X-META-APP-ID") or request_headers.get("x-meta-app-id")
         if meta_app_id:
             logger.debug("Custom Meta app authentication detected (fallback path)")
             return {
-                'auth_method': 'custom_meta_app',
-                'meta_app_id': meta_app_id,
-                'requires_oauth': True  # Complex OAuth flow required
+                "auth_method": "custom_meta_app",
+                "meta_app_id": meta_app_id,
+                "requires_oauth": True,  # Complex OAuth flow required
             }
-        
+
         # No authentication provided
         logger.warning("No authentication method detected in headers")
-        return {
-            'auth_method': 'none',
-            'requires_oauth': False
-        }
-    
-    def handle_bearer_request(self, auth_config: Dict[str, Any], request_body: Dict[str, Any]) -> Dict[str, Any]:
+        return {"auth_method": "none", "requires_oauth": False}
+
+    def handle_bearer_request(self, auth_config: dict[str, Any], request_body: dict[str, Any]) -> dict[str, Any]:
         """Handle request with Bearer token (primary path)
-        
+
         Args:
             auth_config: Authentication configuration from headers
             request_body: JSON-RPC request body
-            
+
         Returns:
             JSON response ready for tool execution
         """
         logger.debug("Processing Bearer authenticated request")
-        token = auth_config['bearer_token']
-        
+        auth_config["bearer_token"]
+
         # Token is ready to use immediately for API calls
         # TODO: In next phases, this will execute the actual tool call
         return {
-            'jsonrpc': '2.0',
-            'result': {
-                'status': 'ready',
-                'auth_method': 'bearer',
-                'message': 'Authentication successful with Bearer token',
-                'token_source': 'bearer_header'
+            "jsonrpc": "2.0",
+            "result": {
+                "status": "ready",
+                "auth_method": "bearer",
+                "message": "Authentication successful with Bearer token",
+                "token_source": "bearer_header",
             },
-            'id': request_body.get('id')
+            "id": request_body.get("id"),
         }
-    
-    def handle_custom_app_request(self, auth_config: Dict[str, Any], request_body: Dict[str, Any]) -> Dict[str, Any]:
+
+    def handle_custom_app_request(self, auth_config: dict[str, Any], request_body: dict[str, Any]) -> dict[str, Any]:
         """Handle request with custom Meta app (fallback path)
-        
+
         Args:
             auth_config: Authentication configuration from headers
             request_body: JSON-RPC request body
-            
+
         Returns:
             JSON response indicating OAuth flow is required
         """
         logger.debug("Processing custom Meta app request (OAuth required)")
-        
+
         # This may require OAuth flow initiation
         # Each request is independent - no session state
         return {
-            'jsonrpc': '2.0',
-            'result': {
-                'status': 'oauth_required',
-                'auth_method': 'custom_meta_app',
-                'meta_app_id': auth_config['meta_app_id'],
-                'message': 'OAuth flow required for custom Meta app authentication',
-                'next_steps': 'Use get_login_link tool to initiate OAuth flow'
+            "jsonrpc": "2.0",
+            "result": {
+                "status": "oauth_required",
+                "auth_method": "custom_meta_app",
+                "meta_app_id": auth_config["meta_app_id"],
+                "message": "OAuth flow required for custom Meta app authentication",
+                "next_steps": "Use get_login_link tool to initiate OAuth flow",
             },
-            'id': request_body.get('id')
+            "id": request_body.get("id"),
         }
-    
-    def handle_unauthenticated_request(self, request_body: Dict[str, Any]) -> Dict[str, Any]:
+
+    def handle_unauthenticated_request(self, request_body: dict[str, Any]) -> dict[str, Any]:
         """Handle request with no authentication
-        
+
         Args:
             request_body: JSON-RPC request body
-            
+
         Returns:
             JSON error response requesting authentication
         """
         logger.warning("Unauthenticated request received")
-        
+
         return {
-            'jsonrpc': '2.0',
-            'error': {
-                'code': -32600,
-                'message': 'Authentication required',
-                'data': {
-                    'supported_methods': [
-                        'Authorization: Bearer <token> (recommended)',
-                        'X-META-APP-ID: Custom Meta app OAuth (advanced users)'
+            "jsonrpc": "2.0",
+            "error": {
+                "code": -32600,
+                "message": "Authentication required",
+                "data": {
+                    "supported_methods": [
+                        "Authorization: Bearer <token> (recommended)",
+                        "X-META-APP-ID: Custom Meta app OAuth (advanced users)",
                     ],
-                }
+                },
             },
-            'id': request_body.get('id')
+            "id": request_body.get("id"),
         }
 
 
@@ -190,7 +179,7 @@ def login_cli():
     """
     logger.info("Starting Meta Ads CLI authentication flow")
     print("Starting Meta Ads CLI authentication flow...")
-    
+
     # Call the common login function
     login_auth()
 
@@ -201,7 +190,7 @@ def main():
     logger.info("Meta Ads MCP server starting")
     logger.debug(f"Python version: {sys.version}")
     logger.debug(f"Args: {sys.argv}")
-    
+
     # Initialize argument parser
     parser = argparse.ArgumentParser(
         description="Meta Ads MCP Server - Model Context Protocol server for Meta Ads API",
@@ -209,37 +198,56 @@ def main():
     parser.add_argument("--login", action="store_true", help="Authenticate with Meta and store the token")
     parser.add_argument("--app-id", type=str, help="Meta App ID (Client ID) for authentication")
     parser.add_argument("--version", action="store_true", help="Show the version of the package")
-    
+
     # Transport configuration arguments
-    parser.add_argument("--transport", type=str, choices=["stdio", "streamable-http"], 
-                       default="stdio", 
-                       help="Transport method: 'stdio' for MCP clients (default), 'streamable-http' for HTTP API access")
-    parser.add_argument("--port", type=int, default=8080, 
-                       help="Port for Streamable HTTP transport (default: 8080, only used with --transport streamable-http)")
-    parser.add_argument("--host", type=str, default="localhost", 
-                       help="Host for Streamable HTTP transport (default: localhost, only used with --transport streamable-http)")
-    parser.add_argument("--sse-response", action="store_true", 
-                       help="Use SSE response format instead of JSON (default: JSON, only used with --transport streamable-http)")
-    
+    parser.add_argument(
+        "--transport",
+        type=str,
+        choices=["stdio", "streamable-http"],
+        default="stdio",
+        help="Transport method: 'stdio' for MCP clients (default), 'streamable-http' for HTTP API access",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Port for Streamable HTTP transport (default: 8080, only used with --transport streamable-http)",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="localhost",
+        help="Host for Streamable HTTP transport (default: localhost, only used with --transport streamable-http)",
+    )
+    parser.add_argument(
+        "--sse-response",
+        action="store_true",
+        help="Use SSE response format instead of JSON (default: JSON, only used with --transport streamable-http)",
+    )
+
     args = parser.parse_args()
     logger.debug(f"Parsed args: login={args.login}, app_id={args.app_id}, version={args.version}")
-    logger.debug(f"Transport args: transport={args.transport}, port={args.port}, host={args.host}, sse_response={args.sse_response}")
-    
+    logger.debug(
+        f"Transport args: transport={args.transport}, port={args.port}, host={args.host}, sse_response={args.sse_response}"
+    )
+
     # Validate CLI argument combinations
     if args.transport == "stdio" and (args.port != 8080 or args.host != "localhost" or args.sse_response):
-        logger.warning("HTTP transport arguments (--port, --host, --sse-response) are ignored when using stdio transport")
+        logger.warning(
+            "HTTP transport arguments (--port, --host, --sse-response) are ignored when using stdio transport"
+        )
         print("Warning: HTTP transport arguments are ignored when using stdio transport")
-    
+
     # Update app ID if provided as environment variable or command line arg
     from .auth import auth_manager, meta_config
-    
+
     # Check environment variable first (early init)
     env_app_id = os.environ.get("META_APP_ID")
     if env_app_id:
         logger.debug(f"Found META_APP_ID in environment: {env_app_id}")
     else:
         logger.warning("META_APP_ID not found in environment variables")
-    
+
     # Command line takes precedence
     if args.app_id:
         logger.info(f"Setting app_id from command line: {args.app_id}")
@@ -249,19 +257,20 @@ def main():
         logger.info(f"Setting app_id from environment: {env_app_id}")
         auth_manager.app_id = env_app_id
         meta_config.set_app_id(env_app_id)
-    
+
     # Log the final app ID that will be used
     logger.info(f"Final app_id from meta_config: {meta_config.get_app_id()}")
     logger.info(f"Final app_id from auth_manager: {auth_manager.app_id}")
     logger.info(f"ENV META_APP_ID: {os.environ.get('META_APP_ID')}")
-    
+
     # Show version if requested
     if args.version:
         from meta_ads_mcp import __version__
+
         logger.info(f"Displaying version: {__version__}")
         print(f"Meta Ads MCP v{__version__}")
         return 0
-    
+
     # Handle login command
     if args.login:
         login_cli()
@@ -274,8 +283,7 @@ def main():
         logger.info("Using local OAuth flow (META_APP_ID configured)")
     else:
         logger.warning(
-            "No META_ACCESS_TOKEN and no META_APP_ID configured -- "
-            "authenticated tool calls will fail until one is set."
+            "No META_ACCESS_TOKEN and no META_APP_ID configured -- authenticated tool calls will fail until one is set."
         )
 
     # Transport-specific server initialization and startup
@@ -285,49 +293,47 @@ def main():
         logger.info(f"Response format: {'SSE' if args.sse_response else 'JSON'}")
         logger.info("Primary auth method: Bearer Token (recommended)")
         logger.info("Fallback auth method: Custom Meta App OAuth (complex setup)")
-        
-        print(f"Starting Meta Ads MCP server with Streamable HTTP transport")
+
+        print("Starting Meta Ads MCP server with Streamable HTTP transport")
         print(f"Server will listen on {args.host}:{args.port}")
         print(f"Response format: {'SSE' if args.sse_response else 'JSON'}")
         print("Primary authentication: Bearer Token (via Authorization: Bearer <token> header)")
         print("Fallback authentication: Custom Meta App OAuth (via X-META-APP-ID header)")
-        
+
         # Configure the existing server with streamable HTTP settings
         mcp_server.settings.host = args.host
         mcp_server.settings.port = args.port
         mcp_server.settings.stateless_http = True
         mcp_server.settings.json_response = not args.sse_response
-        
+
         # Import all tool modules to ensure they are registered
         logger.info("Ensuring all tools are registered for HTTP transport")
-        from . import accounts, campaigns, adsets, ads, insights, authentication
-        from . import ads_library, budget_schedules, reports, openai_deep_research
-        
+
         # ✅ NEW: Setup HTTP authentication middleware
         logger.info("Setting up HTTP authentication middleware")
         try:
             from .http_auth_integration import setup_fastmcp_http_auth
-            
+
             # Setup the FastMCP HTTP auth integration
             setup_fastmcp_http_auth(mcp_server)
             logger.info("FastMCP HTTP authentication integration setup successful")
             print("✅ FastMCP HTTP authentication integration enabled")
             print("   - Bearer tokens via Authorization: Bearer <token> header")
             print("   - Direct Meta tokens via X-META-ACCESS-TOKEN header")
-            
+
         except Exception as e:
             logger.error(f"Failed to setup FastMCP HTTP authentication integration: {e}")
             print(f"⚠️  FastMCP HTTP authentication integration setup failed: {e}")
             print("   Server will still start but may not support header-based auth")
-        
+
         # Log final server configuration
-        logger.info(f"FastMCP server configured with:")
+        logger.info("FastMCP server configured with:")
         logger.info(f"  - Host: {mcp_server.settings.host}")
         logger.info(f"  - Port: {mcp_server.settings.port}")
         logger.info(f"  - Stateless HTTP: {mcp_server.settings.stateless_http}")
         logger.info(f"  - JSON Response: {mcp_server.settings.json_response}")
         logger.info(f"  - Streamable HTTP Path: {mcp_server.settings.streamable_http_path}")
-        
+
         # Install the read-only-by-default write gate after all tools have
         # been imported (the imports above trigger @mcp_server.tool()
         # decorators). See write_gate.install_write_gate for details.
@@ -338,7 +344,7 @@ def main():
         # Start the FastMCP server with Streamable HTTP transport
         try:
             logger.info("Starting FastMCP server with Streamable HTTP transport")
-            print(f"✅ Server configured successfully")
+            print("✅ Server configured successfully")
             print(f"   URL: http://{args.host}:{args.port}{mcp_server.settings.streamable_http_path}/")
             print(f"   Mode: {'Stateless' if mcp_server.settings.stateless_http else 'Stateful'}")
             print(f"   Format: {'JSON' if mcp_server.settings.json_response else 'SSE'}")
@@ -355,4 +361,4 @@ def main():
         install_write_gate(mcp_server, logger)
         write_status = "ENABLED" if is_write_enabled() else "DISABLED (read-only)"
         logger.info("Meta Ads MCP starting with write mode: %s (override via META_ADS_MCP_WRITE)", write_status)
-        mcp_server.run(transport='stdio')
+        mcp_server.run(transport="stdio")

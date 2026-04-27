@@ -1,4 +1,5 @@
 """Resilience utilities: retry with backoff + response size limiting."""
+
 import asyncio
 import functools
 import json
@@ -24,7 +25,9 @@ def safe_response(data: str, context: str, max_size: int = MAX_RESPONSE_SIZE) ->
 
     logger.warning(
         "Response exceeds size limit (%d > %d bytes), truncating [%s]",
-        size, max_size, context,
+        size,
+        max_size,
+        context,
     )
 
     try:
@@ -92,7 +95,10 @@ async def with_resilience(fn, *args, operation_name: str = "api_call", **kwargs)
 
             logger.warning(
                 "%s failed (attempt %d/%d): %s",
-                operation_name, attempt, MAX_RETRIES, e,
+                operation_name,
+                attempt,
+                MAX_RETRIES,
+                e,
             )
 
         if attempt < MAX_RETRIES:

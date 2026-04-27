@@ -4,46 +4,49 @@ Tests video ID extraction from ad creatives (object_story_spec and asset_feed_sp
 and Meta Graph API source URL retrieval, including the advideos edge fallback.
 """
 
-import pytest
 import json
-from unittest.mock import AsyncMock, patch, call
+from unittest.mock import AsyncMock, call, patch
+
+import pytest
+
 from meta_ads_mcp.core.ads import get_ad_video
 
 
 @pytest.mark.asyncio
 class TestGetAdVideo:
-
     async def test_get_ad_video_with_ad_id_object_story_spec(self):
         """Extract video_id from object_story_spec.video_data and return source URL via advideos edge."""
         mock_creatives = {
-            "data": [{
-                "id": "creative_123",
-                "object_story_spec": {
-                    "video_data": {
-                        "video_id": "9999",
-                        "image_url": "https://example.com/thumb.jpg"
-                    }
+            "data": [
+                {
+                    "id": "creative_123",
+                    "object_story_spec": {
+                        "video_data": {"video_id": "9999", "image_url": "https://example.com/thumb.jpg"}
+                    },
                 }
-            }]
+            ]
         }
 
         mock_ad_data = {"account_id": "111222333"}
 
         mock_advideos_response = {
-            "data": [{
-                "id": "9999",
-                "source": "https://video-xx.fbcdn.net/v/example.mp4",
-                "picture": "https://example.com/thumb.jpg",
-                "title": "My Ad Video",
-                "description": "Test description",
-                "length": 30.5,
-                "created_time": "2026-03-01T12:00:00+0000",
-            }]
+            "data": [
+                {
+                    "id": "9999",
+                    "source": "https://video-xx.fbcdn.net/v/example.mp4",
+                    "picture": "https://example.com/thumb.jpg",
+                    "title": "My Ad Video",
+                    "description": "Test description",
+                    "length": 30.5,
+                    "created_time": "2026-03-01T12:00:00+0000",
+                }
+            ]
         }
 
-        with patch('meta_ads_mcp.core.ads.get_ad_creatives', new_callable=AsyncMock) as mock_get_creatives, \
-             patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
-
+        with (
+            patch("meta_ads_mcp.core.ads.get_ad_creatives", new_callable=AsyncMock) as mock_get_creatives,
+            patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api,
+        ):
             mock_get_creatives.return_value = json.dumps(mock_creatives)
             mock_api.side_effect = [mock_ad_data, mock_advideos_response]
 
@@ -63,15 +66,17 @@ class TestGetAdVideo:
     async def test_get_ad_video_advideos_edge_empty_falls_back(self):
         """When advideos edge returns empty (page-owned video), fall back to direct node."""
         mock_creatives = {
-            "data": [{
-                "id": "creative_456",
-                "object_story_spec": {"link_data": {"link": "https://example.com"}},
-                "asset_feed_spec": {
-                    "videos": [
-                        {"video_id": "7777", "thumbnail_url": "https://example.com/thumb2.jpg"},
-                    ]
+            "data": [
+                {
+                    "id": "creative_456",
+                    "object_story_spec": {"link_data": {"link": "https://example.com"}},
+                    "asset_feed_spec": {
+                        "videos": [
+                            {"video_id": "7777", "thumbnail_url": "https://example.com/thumb2.jpg"},
+                        ]
+                    },
                 }
-            }]
+            ]
         }
 
         mock_ad_data = {"account_id": "111222333"}
@@ -82,9 +87,10 @@ class TestGetAdVideo:
             "length": 15.0,
         }
 
-        with patch('meta_ads_mcp.core.ads.get_ad_creatives', new_callable=AsyncMock) as mock_get_creatives, \
-             patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
-
+        with (
+            patch("meta_ads_mcp.core.ads.get_ad_creatives", new_callable=AsyncMock) as mock_get_creatives,
+            patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api,
+        ):
             mock_get_creatives.return_value = json.dumps(mock_creatives)
             # 1) account_id lookup, 2) advideos edge (empty), 3) direct node fallback
             mock_api.side_effect = [mock_ad_data, mock_advideos_empty, mock_direct_video]
@@ -105,7 +111,7 @@ class TestGetAdVideo:
             "length": 60.0,
         }
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = mock_video_details
 
             result = await get_ad_video(access_token="test_token", video_id="5555")
@@ -117,23 +123,22 @@ class TestGetAdVideo:
 
             # Without ad_id, only the direct node call is made
             mock_api.assert_called_once_with(
-                "5555", "test_token",
-                {"fields": "source,title,description,length,picture,thumbnails,created_time"}
+                "5555", "test_token", {"fields": "source,title,description,length,picture,thumbnails,created_time"}
             )
 
     async def test_get_ad_video_no_video_in_creative(self):
         """Return helpful error when the ad is an image ad, not a video ad."""
         mock_creatives = {
-            "data": [{
-                "id": "creative_789",
-                "image_hash": "abc123",
-                "object_story_spec": {
-                    "link_data": {"image_hash": "abc123", "link": "https://example.com"}
+            "data": [
+                {
+                    "id": "creative_789",
+                    "image_hash": "abc123",
+                    "object_story_spec": {"link_data": {"image_hash": "abc123", "link": "https://example.com"}},
                 }
-            }]
+            ]
         }
 
-        with patch('meta_ads_mcp.core.ads.get_ad_creatives', new_callable=AsyncMock) as mock_get_creatives:
+        with patch("meta_ads_mcp.core.ads.get_ad_creatives", new_callable=AsyncMock) as mock_get_creatives:
             mock_get_creatives.return_value = json.dumps(mock_creatives)
 
             result = await get_ad_video(access_token="test_token", ad_id="ad_789")
@@ -151,14 +156,10 @@ class TestGetAdVideo:
     async def test_get_ad_video_api_error(self):
         """Handle Meta API errors gracefully."""
         mock_video_error = {
-            "error": {
-                "message": "Unsupported get request.",
-                "type": "GraphMethodException",
-                "code": 100
-            }
+            "error": {"message": "Unsupported get request.", "type": "GraphMethodException", "code": 100}
         }
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = mock_video_error
 
             result = await get_ad_video(access_token="test_token", video_id="invalid_id")
@@ -170,16 +171,18 @@ class TestGetAdVideo:
     async def test_get_ad_video_with_account_id_param(self):
         """When account_id is provided, skip ad lookup and use advideos edge directly."""
         mock_advideos_response = {
-            "data": [{
-                "id": "6666",
-                "source": "https://video-xx.fbcdn.net/v/bm-token.mp4",
-                "picture": "https://example.com/thumb.jpg",
-                "title": "BM Video",
-                "length": 45.0,
-            }]
+            "data": [
+                {
+                    "id": "6666",
+                    "source": "https://video-xx.fbcdn.net/v/bm-token.mp4",
+                    "picture": "https://example.com/thumb.jpg",
+                    "title": "BM Video",
+                    "length": 45.0,
+                }
+            ]
         }
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             # Only one call: advideos edge (no ad lookup needed)
             mock_api.return_value = mock_advideos_response
 
@@ -195,14 +198,7 @@ class TestGetAdVideo:
 
     async def test_get_ad_video_account_id_lookup_fails(self):
         """When account_id lookup fails, skip advideos edge and go direct."""
-        mock_creatives = {
-            "data": [{
-                "id": "creative_999",
-                "object_story_spec": {
-                    "video_data": {"video_id": "4444"}
-                }
-            }]
-        }
+        mock_creatives = {"data": [{"id": "creative_999", "object_story_spec": {"video_data": {"video_id": "4444"}}}]}
 
         mock_ad_data_error = {"error": {"message": "Not found"}}
         mock_direct_video = {
@@ -211,9 +207,10 @@ class TestGetAdVideo:
             "length": 20.0,
         }
 
-        with patch('meta_ads_mcp.core.ads.get_ad_creatives', new_callable=AsyncMock) as mock_get_creatives, \
-             patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
-
+        with (
+            patch("meta_ads_mcp.core.ads.get_ad_creatives", new_callable=AsyncMock) as mock_get_creatives,
+            patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api,
+        ):
             mock_get_creatives.return_value = json.dumps(mock_creatives)
             # 1) account_id lookup fails (no account_id key), 2) direct fallback
             mock_api.side_effect = [mock_ad_data_error, mock_direct_video]

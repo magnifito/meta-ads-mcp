@@ -6,9 +6,11 @@ entire asset_feed_spec when it encounters it. Users can explicitly pass ad_forma
 to override the default (e.g., for future-proofing if Meta adds support).
 """
 
-import pytest
 import json
 from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from meta_ads_mcp.core.ads import create_ad_creative, update_ad_creative
 
 
@@ -24,7 +26,7 @@ class TestAdFormatsDefaultCreate:
         """
         sample_creative_data = {"id": "123", "name": "Flex", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -35,7 +37,7 @@ class TestAdFormatsDefaultCreate:
                 page_id="987654321",
                 link_url="https://example.com",
                 messages=["Text A", "Text B"],
-                optimization_type="DEGREES_OF_FREEDOM"
+                optimization_type="DEGREES_OF_FREEDOM",
             )
 
             result_data = json.loads(result)
@@ -49,7 +51,7 @@ class TestAdFormatsDefaultCreate:
         """DEGREES_OF_FREEDOM with single image_hash (no image_hashes) omits ad_formats."""
         sample_creative_data = {"id": "123", "name": "Flex", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -60,7 +62,7 @@ class TestAdFormatsDefaultCreate:
                 page_id="987654321",
                 link_url="https://example.com",
                 message="Test",
-                optimization_type="DEGREES_OF_FREEDOM"
+                optimization_type="DEGREES_OF_FREEDOM",
             )
 
             result_data = json.loads(result)
@@ -74,7 +76,7 @@ class TestAdFormatsDefaultCreate:
         """Without DEGREES_OF_FREEDOM, ad_formats defaults to SINGLE_IMAGE."""
         sample_creative_data = {"id": "123", "name": "Dynamic", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -84,7 +86,7 @@ class TestAdFormatsDefaultCreate:
                 image_hashes=["hash1", "hash2"],
                 page_id="987654321",
                 link_url="https://example.com",
-                message="Test"
+                message="Test",
             )
 
             result_data = json.loads(result)
@@ -98,7 +100,7 @@ class TestAdFormatsDefaultCreate:
         """Explicit ad_formats parameter overrides the smart default."""
         sample_creative_data = {"id": "123", "name": "Override", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -110,7 +112,7 @@ class TestAdFormatsDefaultCreate:
                 link_url="https://example.com",
                 message="Test",
                 optimization_type="DEGREES_OF_FREEDOM",
-                ad_formats=["SINGLE_IMAGE"]  # explicit override
+                ad_formats=["SINGLE_IMAGE"],  # explicit override
             )
 
             result_data = json.loads(result)
@@ -125,7 +127,7 @@ class TestAdFormatsDefaultCreate:
         """Explicit AUTOMATIC_FORMAT works even without DEGREES_OF_FREEDOM."""
         sample_creative_data = {"id": "123", "name": "Explicit", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -136,7 +138,7 @@ class TestAdFormatsDefaultCreate:
                 page_id="987654321",
                 link_url="https://example.com",
                 message="Test",
-                ad_formats=["AUTOMATIC_FORMAT"]
+                ad_formats=["AUTOMATIC_FORMAT"],
             )
 
             result_data = json.loads(result)
@@ -150,7 +152,7 @@ class TestAdFormatsDefaultCreate:
         """ad_formats passed as JSON string is coerced to list (MCP transport compat)."""
         sample_creative_data = {"id": "123", "name": "Coerced", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -161,7 +163,7 @@ class TestAdFormatsDefaultCreate:
                 page_id="987654321",
                 link_url="https://example.com",
                 message="Test",
-                ad_formats='["AUTOMATIC_FORMAT"]'  # JSON string
+                ad_formats='["AUTOMATIC_FORMAT"]',  # JSON string
             )
 
             result_data = json.loads(result)
@@ -183,14 +185,14 @@ class TestAdFormatsDefaultUpdate:
         """
         sample_data = {"id": "123", "name": "Updated", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_data
 
             result = await update_ad_creative(
                 access_token="test_token",
                 creative_id="123456789",
                 optimization_type="DEGREES_OF_FREEDOM",
-                headlines=["New Headline"]
+                headlines=["New Headline"],
             )
 
             result_data = json.loads(result)
@@ -204,13 +206,11 @@ class TestAdFormatsDefaultUpdate:
         """update_ad_creative without DEGREES_OF_FREEDOM defaults to SINGLE_IMAGE."""
         sample_data = {"id": "123", "name": "Updated", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_data
 
             result = await update_ad_creative(
-                access_token="test_token",
-                creative_id="123456789",
-                headlines=["New Headline"]
+                access_token="test_token", creative_id="123456789", headlines=["New Headline"]
             )
 
             result_data = json.loads(result)
@@ -224,7 +224,7 @@ class TestAdFormatsDefaultUpdate:
         """update_ad_creative with explicit ad_formats overrides default."""
         sample_data = {"id": "123", "name": "Updated", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_data
 
             result = await update_ad_creative(
@@ -232,7 +232,7 @@ class TestAdFormatsDefaultUpdate:
                 creative_id="123456789",
                 optimization_type="DEGREES_OF_FREEDOM",
                 headlines=["New Headline"],
-                ad_formats=["SINGLE_IMAGE"]  # explicit override
+                ad_formats=["SINGLE_IMAGE"],  # explicit override
             )
 
             result_data = json.loads(result)
@@ -251,7 +251,7 @@ class TestFlexibleCreativeFullFlow:
         """Full DEGREES_OF_FREEDOM + image_hashes creative produces correct Flexible payload."""
         sample_creative_data = {"id": "123", "name": "Full Flex", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -265,7 +265,7 @@ class TestFlexibleCreativeFullFlow:
                 headlines=["Headline 1", "Headline 2"],
                 descriptions=["Desc 1", "Desc 2"],
                 optimization_type="DEGREES_OF_FREEDOM",
-                call_to_action_type="SHOP_NOW"
+                call_to_action_type="SHOP_NOW",
             )
 
             result_data = json.loads(result)
@@ -277,18 +277,10 @@ class TestFlexibleCreativeFullFlow:
             # DOF creatives omit ad_formats — Meta handles format via optimization_type
             assert "ad_formats" not in afs
             assert afs["optimization_type"] == "DEGREES_OF_FREEDOM"
-            assert afs["images"] == [
-                {"hash": "hash1"}, {"hash": "hash2"}, {"hash": "hash3"}
-            ]
-            assert afs["bodies"] == [
-                {"text": "Primary text A"}, {"text": "Primary text B"}
-            ]
-            assert afs["titles"] == [
-                {"text": "Headline 1"}, {"text": "Headline 2"}
-            ]
-            assert afs["descriptions"] == [
-                {"text": "Desc 1"}, {"text": "Desc 2"}
-            ]
+            assert afs["images"] == [{"hash": "hash1"}, {"hash": "hash2"}, {"hash": "hash3"}]
+            assert afs["bodies"] == [{"text": "Primary text A"}, {"text": "Primary text B"}]
+            assert afs["titles"] == [{"text": "Headline 1"}, {"text": "Headline 2"}]
+            assert afs["descriptions"] == [{"text": "Desc 1"}, {"text": "Desc 2"}]
             # DOF: CTA goes in object_story_spec.link_data, not in asset_feed_spec
             assert "call_to_action_types" not in afs
             # DOF: link_urls omitted, link goes in link_data.link
@@ -314,7 +306,7 @@ class TestFlexibleCreativeFullFlow:
         """
         sample_creative_data = {"id": "123", "name": "Single Flex", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -327,7 +319,7 @@ class TestFlexibleCreativeFullFlow:
                 messages=["Primary text A", "Primary text B"],
                 headlines=["Headline 1", "Headline 2"],
                 optimization_type="DEGREES_OF_FREEDOM",
-                call_to_action_type="SHOP_NOW"
+                call_to_action_type="SHOP_NOW",
             )
 
             result_data = json.loads(result)
@@ -349,14 +341,14 @@ class TestFlexibleCreativeFullFlow:
                     "link": "https://example.com",
                     "image_hash": "hash1",
                     "call_to_action": {"type": "SHOP_NOW", "value": {"link": "https://example.com"}},
-                }
+                },
             }
 
     async def test_backward_compat_simple_creative_unaffected(self):
         """Simple creative (no asset_feed_spec) is unaffected by ad_formats changes."""
         sample_creative_data = {"id": "123", "name": "Simple", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -367,7 +359,7 @@ class TestFlexibleCreativeFullFlow:
                 page_id="987654321",
                 link_url="https://example.com",
                 message="Test message",
-                headline="Single Headline"
+                headline="Single Headline",
             )
 
             result_data = json.loads(result)

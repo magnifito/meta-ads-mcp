@@ -1,8 +1,10 @@
 """Tests for create_ad_creative readback-based collapse detection."""
 
-import pytest
 import json
 from unittest.mock import patch
+
+import pytest
+
 from meta_ads_mcp.core.ads import create_ad_creative
 
 

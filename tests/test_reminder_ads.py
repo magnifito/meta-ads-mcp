@@ -7,11 +7,11 @@ FB event / ig_upcoming_event_id.
 """
 
 import json
-import pytest
 from unittest.mock import patch
 
-from meta_ads_mcp.core.ads import create_ad_creative
+import pytest
 
+from meta_ads_mcp.core.ads import create_ad_creative
 
 REMINDER = {
     "event_name": "Summer Sale",
@@ -39,9 +39,10 @@ def _mock_api_responses(creative_id="creative_reminder_1"):
 @pytest.mark.asyncio
 async def test_reminder_data_in_simple_image_link_data():
     """reminder_data is placed inside object_story_spec.link_data for a simple image creative."""
-    with patch("meta_ads_mcp.core.ads.make_api_request") as mock_api, \
-         patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover:
-
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
         mock_discover.return_value = _mock_discovery()
         mock_api.side_effect = _mock_api_responses()
 
@@ -79,9 +80,10 @@ async def test_reminder_data_in_simple_image_link_data():
 @pytest.mark.asyncio
 async def test_reminder_data_without_link_url():
     """reminder_data can be used without link_url (link_url is optional when reminder_data is provided)."""
-    with patch("meta_ads_mcp.core.ads.make_api_request") as mock_api, \
-         patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover:
-
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
         mock_discover.return_value = _mock_discovery()
         mock_api.side_effect = _mock_api_responses()
 
@@ -110,9 +112,10 @@ async def test_reminder_data_without_link_url():
 @pytest.mark.asyncio
 async def test_reminder_data_as_json_string_is_coerced():
     """reminder_data passed as a JSON string (some MCP transports) is coerced to a dict."""
-    with patch("meta_ads_mcp.core.ads.make_api_request") as mock_api, \
-         patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover:
-
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
         mock_discover.return_value = _mock_discovery()
         mock_api.side_effect = _mock_api_responses()
 
@@ -141,9 +144,10 @@ async def test_reminder_data_as_json_string_is_coerced():
 @pytest.mark.asyncio
 async def test_no_reminder_data_does_not_inject_field():
     """When reminder_data is not provided, link_data must NOT contain a reminder_data key."""
-    with patch("meta_ads_mcp.core.ads.make_api_request") as mock_api, \
-         patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover:
-
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
         mock_discover.return_value = _mock_discovery()
         mock_api.side_effect = [
             {"id": "creative_regular"},

@@ -5,14 +5,13 @@ This module provides direct integration with FastMCP to inject authentication
 from HTTP headers into the tool execution context.
 """
 
-import asyncio
 import contextvars
-from typing import Optional
+
 from .utils import logger
-import json
 
 # Use context variables instead of thread-local storage for better async support
-_auth_token: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar('auth_token', default=None)
+_auth_token: contextvars.ContextVar[str | None] = contextvars.ContextVar("auth_token", default=None)
+
 
 class FastMCPAuthIntegration:
     """Direct integration with FastMCP for HTTP authentication"""
@@ -27,7 +26,7 @@ class FastMCPAuthIntegration:
         _auth_token.set(token)
 
     @staticmethod
-    def get_auth_token() -> Optional[str]:
+    def get_auth_token() -> str | None:
         """Get authentication token for the current context
 
         Returns:
@@ -41,7 +40,7 @@ class FastMCPAuthIntegration:
         _auth_token.set(None)
 
     @staticmethod
-    def extract_token_from_headers(headers: dict) -> Optional[str]:
+    def extract_token_from_headers(headers: dict) -> str | None:
         """Extract token from HTTP headers
 
         Args:
@@ -51,18 +50,19 @@ class FastMCPAuthIntegration:
             Token if found, None otherwise
         """
         # Check for Bearer token in Authorization header (primary method)
-        auth_header = headers.get('Authorization') or headers.get('authorization')
-        if auth_header and auth_header.lower().startswith('bearer '):
+        auth_header = headers.get("Authorization") or headers.get("authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
             token = auth_header[7:].strip()
             logger.debug("Found Bearer token in Authorization header")
             return token
 
         # Check for direct Meta access token
-        meta_token = headers.get('X-META-ACCESS-TOKEN') or headers.get('x-meta-access-token')
+        meta_token = headers.get("X-META-ACCESS-TOKEN") or headers.get("x-meta-access-token")
         if meta_token:
             return meta_token
 
         return None
+
 
 def patch_fastmcp_server(mcp_server):
     """Patch FastMCP server to inject authentication from HTTP headers
@@ -90,19 +90,18 @@ def patch_fastmcp_server(mcp_server):
     mcp_server.run = patched_run
     logger.info("FastMCP server patching complete")
 
+
 def setup_http_auth_patching():
     """Setup HTTP authentication patching for auth system"""
     logger.info("Setting up HTTP authentication patching")
 
     # Import and patch the auth system
-    from . import auth
-    from . import api
-    from . import authentication
+    from . import api, auth, authentication
 
     # Store the original function
     original_get_current_access_token = auth.get_current_access_token
 
-    async def get_current_access_token_with_http_support() -> Optional[str]:
+    async def get_current_access_token_with_http_support() -> str | None:
         """Enhanced get_current_access_token that checks HTTP context first"""
 
         # Check for context-scoped token first
@@ -120,12 +119,15 @@ def setup_http_auth_patching():
 
     logger.info("Auth system patching complete - patched in auth, api, and authentication modules")
 
+
 # Global instance for easy access
 fastmcp_auth = FastMCPAuthIntegration()
+
 
 # Forward declaration of setup_starlette_middleware
 def setup_starlette_middleware(app):
     pass
+
 
 def setup_fastmcp_http_auth(mcp_server):
     """Setup HTTP authentication integration with FastMCP
@@ -137,7 +139,7 @@ def setup_fastmcp_http_auth(mcp_server):
 
     # 1. Patch FastMCP's run method to ensure our get_current_access_token patch is applied
     # This remains crucial for the token to be picked up by tool calls.
-    patch_fastmcp_server(mcp_server) # This patches mcp_server.run
+    patch_fastmcp_server(mcp_server)  # This patches mcp_server.run
 
     # 2. Patch the methods that provide the Starlette app instance
     # This ensures our middleware is added to the app Uvicorn will actually serve.
@@ -148,27 +150,35 @@ def setup_fastmcp_http_auth(mcp_server):
             app_provider_methods.append("streamable_http_app")
         else:
             logger.warning("mcp_server.streamable_http_app not found or not callable, cannot patch for JSON responses.")
-    else: # SSE
+    else:  # SSE
         if hasattr(mcp_server, "sse_app") and callable(mcp_server.sse_app):
             app_provider_methods.append("sse_app")
         else:
             logger.warning("mcp_server.sse_app not found or not callable, cannot patch for SSE responses.")
 
     if not app_provider_methods:
-        logger.error("No suitable app provider method (streamable_http_app or sse_app) found on mcp_server. Cannot add HTTP Auth middleware.")
+        logger.error(
+            "No suitable app provider method (streamable_http_app or sse_app) found on mcp_server. Cannot add HTTP Auth middleware."
+        )
 
     for method_name in app_provider_methods:
         original_app_provider_method = getattr(mcp_server, method_name)
 
-        def new_patched_app_provider_method(*args, **kwargs):
-            # Call the original method to get/create the Starlette app
-            app = original_app_provider_method(*args, **kwargs)
+        # Bind loop vars as defaults so each closure captures its own copy
+        # (without this, every patched method would call the LAST iteration's
+        # original_app_provider_method — classic Python late-binding bug).
+        def new_patched_app_provider_method(
+            *args,
+            _original=original_app_provider_method,
+            _name=method_name,
+            **kwargs,
+        ):
+            app = _original(*args, **kwargs)
             if app:
-                logger.debug(f"Original {method_name} returned app: {type(app)}. Adding AuthInjectionMiddleware.")
-                # Now, add our middleware to this specific app instance
+                logger.debug(f"Original {_name} returned app: {type(app)}. Adding AuthInjectionMiddleware.")
                 setup_starlette_middleware(app)
             else:
-                logger.error(f"Original {method_name} returned None or a non-app object.")
+                logger.error(f"Original {_name} returned None or a non-app object.")
             return app
 
         setattr(mcp_server, method_name, new_patched_app_provider_method)
@@ -176,9 +186,11 @@ def setup_fastmcp_http_auth(mcp_server):
 
     logger.info("FastMCP HTTP authentication integration setup attempt complete.")
 
+
 # --- AuthInjectionMiddleware definition ---
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+
 
 class AuthInjectionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -200,6 +212,7 @@ class AuthInjectionMiddleware(BaseHTTPMiddleware):
         finally:
             if auth_token:
                 FastMCPAuthIntegration.clear_auth_token()
+
 
 def setup_starlette_middleware(app):
     """Add AuthInjectionMiddleware to the Starlette app if not already present.

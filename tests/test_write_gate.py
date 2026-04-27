@@ -24,7 +24,6 @@ from meta_ads_mcp.core.write_gate import (
     is_write_tool,
 )
 
-
 # Canonical read-tool fixture — must stay in sync with the server.
 # A new tool registered without updating this list or WRITE_TOOLS will
 # trip the drift alarm below.
@@ -74,11 +73,12 @@ def _registered_tool_names() -> set[str]:
     import importlib
 
     import meta_ads_mcp  # noqa: F401  (loads core, triggers registration)
-    from meta_ads_mcp.core import server as server_module
 
     # Re-import conditional modules so the env flags set above take effect
     # even if a prior test import happened before the flags were set.
-    from meta_ads_mcp.core import reports, ads_library, authentication
+    from meta_ads_mcp.core import ads_library, authentication, reports
+    from meta_ads_mcp.core import server as server_module
+
     for mod in (reports, ads_library, authentication):
         importlib.reload(mod)
 
@@ -93,8 +93,7 @@ class TestToolClassificationDriftAlarm:
         classified = WRITE_TOOLS | READ_TOOLS
         uncovered = sorted(n for n in registered if n not in classified)
         assert uncovered == [], (
-            "New tools were registered without updating WRITE_TOOLS or the "
-            f"READ_TOOLS test fixture: {uncovered}"
+            f"New tools were registered without updating WRITE_TOOLS or the READ_TOOLS test fixture: {uncovered}"
         )
 
     def test_write_and_read_do_not_overlap(self) -> None:
@@ -146,9 +145,7 @@ class TestFilterTools:
         assert "get_insights" in names
 
     def test_returns_everything_when_enabled(self) -> None:
-        filtered = filter_tools(
-            self._sample(), {"META_ADS_MCP_WRITE": "true"}
-        )
+        filtered = filter_tools(self._sample(), {"META_ADS_MCP_WRITE": "true"})
         names = {t.name for t in filtered}
         assert names == {
             "get_campaigns",

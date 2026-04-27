@@ -4,9 +4,11 @@ Tests that update_ad_creative provides clear, actionable error messages
 when Meta API rejects content updates (error_subcode 1815573).
 """
 
-import pytest
 import json
 from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from meta_ads_mcp.core.ads import update_ad_creative
 
 
@@ -35,22 +37,18 @@ class TestUpdateAdCreativeContentLimit:
                         "type": "OAuthException",
                         "code": 100,
                         "error_subcode": 1815573,
-                        "fbtrace_id": "abc123"
+                        "fbtrace_id": "abc123",
                     }
                 },
-                "full_response": {
-                    "status_code": 400
-                }
+                "full_response": {"status_code": 400},
             }
         }
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = api_error
 
             result = await update_ad_creative(
-                creative_id="test_creative_123",
-                message="New message text",
-                access_token="test_token"
+                creative_id="test_creative_123", message="New message text", access_token="test_token"
             )
 
             result_data = _unwrap_result(result)
@@ -75,17 +73,15 @@ class TestUpdateAdCreativeContentLimit:
                         "error_subcode": 1815573,
                     }
                 },
-                "full_response": {"status_code": 400}
+                "full_response": {"status_code": 400},
             }
         }
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = api_error
 
             result = await update_ad_creative(
-                creative_id="test_creative_123",
-                headline="New headline",
-                access_token="test_token"
+                creative_id="test_creative_123", headline="New headline", access_token="test_token"
             )
 
             result_data = _unwrap_result(result)
@@ -96,19 +92,13 @@ class TestUpdateAdCreativeContentLimit:
         """Name-only updates should succeed normally (not trigger 1815573 path)."""
 
         success_response = {"id": "test_creative_123"}
-        creative_details = {
-            "id": "test_creative_123",
-            "name": "Updated Name",
-            "status": "ACTIVE"
-        }
+        creative_details = {"id": "test_creative_123", "name": "Updated Name", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.side_effect = [success_response, creative_details]
 
             result = await update_ad_creative(
-                creative_id="test_creative_123",
-                name="Updated Name",
-                access_token="test_token"
+                creative_id="test_creative_123", name="Updated Name", access_token="test_token"
             )
 
             result_data = _unwrap_result(result)
@@ -129,17 +119,15 @@ class TestUpdateAdCreativeContentLimit:
                         "error_subcode": 9999,
                     }
                 },
-                "full_response": {"status_code": 400}
+                "full_response": {"status_code": 400},
             }
         }
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = api_error
 
             result = await update_ad_creative(
-                creative_id="test_creative_123",
-                message="New message",
-                access_token="test_token"
+                creative_id="test_creative_123", message="New message", access_token="test_token"
             )
 
             result_data = _unwrap_result(result)

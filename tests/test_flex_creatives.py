@@ -8,9 +8,11 @@ Tests for create_ad_creative and update_ad_creative support for:
 - Backward compatibility (no optimization_type → same behavior as before)
 """
 
-import pytest
 import json
 from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from meta_ads_mcp.core.ads import create_ad_creative, update_ad_creative
 
 
@@ -20,13 +22,9 @@ class TestFlexCreatives:
 
     async def test_flex_creative_includes_optimization_type(self):
         """FLEX creative with optimization_type='DEGREES_OF_FREEDOM' includes it in asset_feed_spec."""
-        sample_creative_data = {
-            "id": "123456789",
-            "name": "FLEX Creative",
-            "status": "ACTIVE"
-        }
+        sample_creative_data = {"id": "123456789", "name": "FLEX Creative", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -38,7 +36,7 @@ class TestFlexCreatives:
                 link_url="https://example.com",
                 message="Test message",
                 optimization_type="DEGREES_OF_FREEDOM",
-                call_to_action_type="LEARN_MORE"
+                call_to_action_type="LEARN_MORE",
             )
 
             result_data = json.loads(result)
@@ -53,13 +51,9 @@ class TestFlexCreatives:
 
     async def test_flex_creative_multiple_image_hashes(self):
         """Multiple image_hashes with DOF: call proceeds but includes a warning in the response."""
-        sample_creative_data = {
-            "id": "123456789",
-            "name": "Multi-Image FLEX",
-            "status": "ACTIVE"
-        }
+        sample_creative_data = {"id": "123456789", "name": "Multi-Image FLEX", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -70,7 +64,7 @@ class TestFlexCreatives:
                 page_id="987654321",
                 link_url="https://example.com",
                 message="Test message",
-                optimization_type="DEGREES_OF_FREEDOM"
+                optimization_type="DEGREES_OF_FREEDOM",
             )
 
             result_data = json.loads(result)
@@ -87,18 +81,14 @@ class TestFlexCreatives:
             assert creative_data["asset_feed_spec"]["images"] == [
                 {"hash": "hash1"},
                 {"hash": "hash2"},
-                {"hash": "hash3"}
+                {"hash": "hash3"},
             ]
 
     async def test_flex_creative_multiple_messages(self):
         """Multiple messages produces correct bodies array in asset_feed_spec."""
-        sample_creative_data = {
-            "id": "123456789",
-            "name": "Multi-Message FLEX",
-            "status": "ACTIVE"
-        }
+        sample_creative_data = {"id": "123456789", "name": "Multi-Message FLEX", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -109,7 +99,7 @@ class TestFlexCreatives:
                 page_id="987654321",
                 link_url="https://example.com",
                 messages=["Primary text A", "Primary text B", "Primary text C"],
-                optimization_type="DEGREES_OF_FREEDOM"
+                optimization_type="DEGREES_OF_FREEDOM",
             )
 
             result_data = json.loads(result)
@@ -123,7 +113,7 @@ class TestFlexCreatives:
             assert creative_data["asset_feed_spec"]["bodies"] == [
                 {"text": "Primary text A"},
                 {"text": "Primary text B"},
-                {"text": "Primary text C"}
+                {"text": "Primary text C"},
             ]
 
     async def test_validation_cannot_mix_image_hash_and_image_hashes(self):
@@ -134,7 +124,7 @@ class TestFlexCreatives:
             name="Test",
             image_hash="abc123",
             image_hashes=["hash1", "hash2"],
-            page_id="987654321"
+            page_id="987654321",
         )
 
         result_data = json.loads(result)
@@ -155,7 +145,7 @@ class TestFlexCreatives:
             image_hash="abc123",
             page_id="987654321",
             message="Single text",
-            messages=["Text A", "Text B"]
+            messages=["Text A", "Text B"],
         )
 
         result_data = json.loads(result)
@@ -176,7 +166,7 @@ class TestFlexCreatives:
             account_id="act_123456789",
             name="Test",
             image_hashes=too_many,
-            page_id="987654321"
+            page_id="987654321",
         )
 
         result_data = json.loads(result)
@@ -199,7 +189,7 @@ class TestFlexCreatives:
             name="Test",
             image_hash="abc123",
             page_id="987654321",
-            optimization_type="PLACEMENT"
+            optimization_type="PLACEMENT",
         )
 
         result_data = json.loads(result)
@@ -214,13 +204,9 @@ class TestFlexCreatives:
 
     async def test_flex_creative_single_image_uses_asset_feed_spec(self):
         """FLEX creative with single image still uses asset_feed_spec when optimization_type is set."""
-        sample_creative_data = {
-            "id": "123456789",
-            "name": "Single Image FLEX",
-            "status": "ACTIVE"
-        }
+        sample_creative_data = {"id": "123456789", "name": "Single Image FLEX", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -231,7 +217,7 @@ class TestFlexCreatives:
                 page_id="987654321",
                 link_url="https://example.com",
                 message="Test message",
-                optimization_type="DEGREES_OF_FREEDOM"
+                optimization_type="DEGREES_OF_FREEDOM",
             )
 
             result_data = json.loads(result)
@@ -251,18 +237,14 @@ class TestFlexCreatives:
             # (fix for subcode 2446388 "Could not get image for creative")
             assert creative_data["object_story_spec"] == {
                 "page_id": "987654321",
-                "link_data": {"link": "https://example.com", "image_hash": "abc123"}
+                "link_data": {"link": "https://example.com", "image_hash": "abc123"},
             }
 
     async def test_no_optimization_type_unchanged_behavior(self):
         """Without optimization_type, single image+headline uses object_story_spec (backward compat)."""
-        sample_creative_data = {
-            "id": "123456789",
-            "name": "Simple Creative",
-            "status": "ACTIVE"
-        }
+        sample_creative_data = {"id": "123456789", "name": "Simple Creative", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -273,7 +255,7 @@ class TestFlexCreatives:
                 page_id="987654321",
                 link_url="https://example.com",
                 message="Test message",
-                headline="Single Headline"
+                headline="Single Headline",
             )
 
             result_data = json.loads(result)
@@ -291,13 +273,9 @@ class TestFlexCreatives:
 
     async def test_flex_creative_full_combination(self):
         """FLEX creative with all plural params: image_hashes, messages, headlines, descriptions."""
-        sample_creative_data = {
-            "id": "123456789",
-            "name": "Full FLEX",
-            "status": "ACTIVE"
-        }
+        sample_creative_data = {"id": "123456789", "name": "Full FLEX", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -311,7 +289,7 @@ class TestFlexCreatives:
                 headlines=["Headline 1", "Headline 2"],
                 descriptions=["Desc 1", "Desc 2"],
                 optimization_type="DEGREES_OF_FREEDOM",
-                call_to_action_type="SHOP_NOW"
+                call_to_action_type="SHOP_NOW",
             )
 
             result_data = json.loads(result)
@@ -346,13 +324,9 @@ class TestFlexCreatives:
 
     async def test_image_hashes_without_optimization_type_uses_asset_feed(self):
         """image_hashes (plural) triggers asset_feed_spec even without optimization_type."""
-        sample_creative_data = {
-            "id": "123456789",
-            "name": "Multi Image",
-            "status": "ACTIVE"
-        }
+        sample_creative_data = {"id": "123456789", "name": "Multi Image", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -362,7 +336,7 @@ class TestFlexCreatives:
                 image_hashes=["hash1", "hash2"],
                 page_id="987654321",
                 link_url="https://example.com",
-                message="Test message"
+                message="Test message",
             )
 
             result_data = json.loads(result)
@@ -373,9 +347,7 @@ class TestFlexCreatives:
             creative_data = first_call[0][2]
 
             assert "asset_feed_spec" in creative_data
-            assert creative_data["asset_feed_spec"]["images"] == [
-                {"hash": "hash1"}, {"hash": "hash2"}
-            ]
+            assert creative_data["asset_feed_spec"]["images"] == [{"hash": "hash1"}, {"hash": "hash2"}]
             # No optimization_type should be set
             assert "optimization_type" not in creative_data["asset_feed_spec"]
 
@@ -387,10 +359,7 @@ class TestFlexCreatives:
     async def test_no_image_hash_or_image_hashes_returns_error(self):
         """Must provide either image_hash, image_hashes, or video_id."""
         result = await create_ad_creative(
-            access_token="test_token",
-            account_id="act_123456789",
-            name="Test",
-            page_id="987654321"
+            access_token="test_token", account_id="act_123456789", name="Test", page_id="987654321"
         )
 
         result_data = json.loads(result)
@@ -409,20 +378,16 @@ class TestFlexCreativesUpdate:
 
     async def test_update_with_optimization_type(self):
         """Update creative with optimization_type includes it in asset_feed_spec."""
-        sample_creative_data = {
-            "id": "123456789",
-            "name": "Updated FLEX",
-            "status": "ACTIVE"
-        }
+        sample_creative_data = {"id": "123456789", "name": "Updated FLEX", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await update_ad_creative(
                 access_token="test_token",
                 creative_id="123456789",
                 optimization_type="DEGREES_OF_FREEDOM",
-                headlines=["New Headline"]
+                headlines=["New Headline"],
             )
 
             result_data = json.loads(result)
@@ -437,19 +402,13 @@ class TestFlexCreativesUpdate:
 
     async def test_update_with_messages_plural(self):
         """Update creative with messages (plural) produces correct bodies array."""
-        sample_creative_data = {
-            "id": "123456789",
-            "name": "Updated",
-            "status": "ACTIVE"
-        }
+        sample_creative_data = {"id": "123456789", "name": "Updated", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await update_ad_creative(
-                access_token="test_token",
-                creative_id="123456789",
-                messages=["Text A", "Text B"]
+                access_token="test_token", creative_id="123456789", messages=["Text A", "Text B"]
             )
 
             result_data = json.loads(result)
@@ -460,17 +419,12 @@ class TestFlexCreativesUpdate:
             creative_data = first_call[0][2]
 
             assert "asset_feed_spec" in creative_data
-            assert creative_data["asset_feed_spec"]["bodies"] == [
-                {"text": "Text A"}, {"text": "Text B"}
-            ]
+            assert creative_data["asset_feed_spec"]["bodies"] == [{"text": "Text A"}, {"text": "Text B"}]
 
     async def test_update_validation_cannot_mix_message_and_messages(self):
         """Cannot specify both message and messages in update."""
         result = await update_ad_creative(
-            access_token="test_token",
-            creative_id="123456789",
-            message="Single",
-            messages=["A", "B"]
+            access_token="test_token", creative_id="123456789", message="Single", messages=["A", "B"]
         )
 
         result_data = json.loads(result)
@@ -485,9 +439,7 @@ class TestFlexCreativesUpdate:
     async def test_update_validation_invalid_optimization_type(self):
         """Invalid optimization_type rejected in update."""
         result = await update_ad_creative(
-            access_token="test_token",
-            creative_id="123456789",
-            optimization_type="BAD_VALUE"
+            access_token="test_token", creative_id="123456789", optimization_type="BAD_VALUE"
         )
 
         result_data = json.loads(result)
@@ -501,19 +453,13 @@ class TestFlexCreativesUpdate:
 
     async def test_update_optimization_type_alone_triggers_asset_feed(self):
         """Setting only optimization_type triggers asset_feed_spec path."""
-        sample_creative_data = {
-            "id": "123456789",
-            "name": "FLEX",
-            "status": "ACTIVE"
-        }
+        sample_creative_data = {"id": "123456789", "name": "FLEX", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await update_ad_creative(
-                access_token="test_token",
-                creative_id="123456789",
-                optimization_type="DEGREES_OF_FREEDOM"
+                access_token="test_token", creative_id="123456789", optimization_type="DEGREES_OF_FREEDOM"
             )
 
             result_data = json.loads(result)
@@ -533,13 +479,9 @@ class TestSingularParamPromotion:
 
     async def test_singular_headline_promoted_with_optimization_type(self):
         """Singular headline is auto-promoted to titles array when optimization_type forces asset_feed_spec."""
-        sample_creative_data = {
-            "id": "123456789",
-            "name": "FLEX with singular headline",
-            "status": "ACTIVE"
-        }
+        sample_creative_data = {"id": "123456789", "name": "FLEX with singular headline", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -550,7 +492,7 @@ class TestSingularParamPromotion:
                 page_id="987654321",
                 link_url="https://example.com",
                 headline="My Single Headline",
-                optimization_type="DEGREES_OF_FREEDOM"
+                optimization_type="DEGREES_OF_FREEDOM",
             )
 
             result_data = json.loads(result)
@@ -565,13 +507,9 @@ class TestSingularParamPromotion:
 
     async def test_singular_description_promoted_with_optimization_type(self):
         """Singular description is auto-promoted to descriptions array when optimization_type forces asset_feed_spec."""
-        sample_creative_data = {
-            "id": "123456789",
-            "name": "FLEX with singular description",
-            "status": "ACTIVE"
-        }
+        sample_creative_data = {"id": "123456789", "name": "FLEX with singular description", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -582,7 +520,7 @@ class TestSingularParamPromotion:
                 page_id="987654321",
                 link_url="https://example.com",
                 description="My Single Description",
-                optimization_type="DEGREES_OF_FREEDOM"
+                optimization_type="DEGREES_OF_FREEDOM",
             )
 
             result_data = json.loads(result)
@@ -597,13 +535,9 @@ class TestSingularParamPromotion:
 
     async def test_all_singular_params_promoted_with_optimization_type(self):
         """All singular params (headline, description, message) promoted when optimization_type is set."""
-        sample_creative_data = {
-            "id": "123456789",
-            "name": "FLEX all singular",
-            "status": "ACTIVE"
-        }
+        sample_creative_data = {"id": "123456789", "name": "FLEX all singular", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await create_ad_creative(
@@ -617,7 +551,7 @@ class TestSingularParamPromotion:
                 headline="My headline",
                 description="My description",
                 optimization_type="DEGREES_OF_FREEDOM",
-                call_to_action_type="LEARN_MORE"
+                call_to_action_type="LEARN_MORE",
             )
 
             result_data = json.loads(result)
@@ -638,25 +572,22 @@ class TestSingularParamPromotion:
 
             # CTA is placed in link_data for DOF creatives
             assert creative_data["object_story_spec"]["link_data"]["call_to_action"] == {
-                "type": "LEARN_MORE", "value": {"link": "https://example.com"}
+                "type": "LEARN_MORE",
+                "value": {"link": "https://example.com"},
             }
 
     async def test_update_singular_headline_promoted_with_optimization_type(self):
         """Singular headline promoted in update_ad_creative when optimization_type is set."""
-        sample_creative_data = {
-            "id": "123456789",
-            "name": "Updated",
-            "status": "ACTIVE"
-        }
+        sample_creative_data = {"id": "123456789", "name": "Updated", "status": "ACTIVE"}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = sample_creative_data
 
             result = await update_ad_creative(
                 access_token="test_token",
                 creative_id="123456789",
                 headline="Updated Headline",
-                optimization_type="DEGREES_OF_FREEDOM"
+                optimization_type="DEGREES_OF_FREEDOM",
             )
 
             result_data = json.loads(result)

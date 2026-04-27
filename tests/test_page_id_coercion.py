@@ -9,9 +9,10 @@ The fix (commit 5eee32e) adds str(page_id) normalization in create_ad_creative
 and in _discover_pages_for_account.
 """
 
-import pytest
 import json
-from unittest.mock import AsyncMock, patch, call
+from unittest.mock import AsyncMock, call, patch
+
+import pytest
 
 
 class TestPageIdCoercion:
@@ -23,9 +24,10 @@ class TestPageIdCoercion:
         in the object_story_spec sent to the Meta API."""
         from meta_ads_mcp.core.ads import create_ad_creative
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api, \
-             patch('meta_ads_mcp.core.auth.get_current_access_token') as mock_get_token:
-
+        with (
+            patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api,
+            patch("meta_ads_mcp.core.auth.get_current_access_token") as mock_get_token,
+        ):
             mock_get_token.return_value = "test_token"
             mock_api.return_value = {"id": "fake_creative_123"}
 
@@ -58,9 +60,10 @@ class TestPageIdCoercion:
         """When page_id is already a string, it should remain a string."""
         from meta_ads_mcp.core.ads import create_ad_creative
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api, \
-             patch('meta_ads_mcp.core.auth.get_current_access_token') as mock_get_token:
-
+        with (
+            patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api,
+            patch("meta_ads_mcp.core.auth.get_current_access_token") as mock_get_token,
+        ):
             mock_get_token.return_value = "test_token"
             mock_api.return_value = {"id": "fake_creative_123"}
 
@@ -99,10 +102,11 @@ class TestPageIdCoercion:
             "source": "client_pages",
         }
 
-        with patch('meta_ads_mcp.core.ads._discover_pages_for_account', new_callable=AsyncMock) as mock_discover, \
-             patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api, \
-             patch('meta_ads_mcp.core.auth.get_current_access_token') as mock_get_token:
-
+        with (
+            patch("meta_ads_mcp.core.ads._discover_pages_for_account", new_callable=AsyncMock) as mock_discover,
+            patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api,
+            patch("meta_ads_mcp.core.auth.get_current_access_token") as mock_get_token,
+        ):
             mock_get_token.return_value = "test_token"
             mock_discover.return_value = mock_discovery
             mock_api.return_value = {"id": "fake_creative_123"}

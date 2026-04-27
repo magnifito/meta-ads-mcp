@@ -18,8 +18,8 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Iterable, Mapping, Optional, Sequence
-
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 WRITE_TOOLS: frozenset[str] = frozenset(
     {
@@ -52,7 +52,7 @@ def is_write_tool(name: str) -> bool:
     return name in WRITE_TOOLS
 
 
-def is_write_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
+def is_write_enabled(env: Mapping[str, str] | None = None) -> bool:
     """Return True when the META_ADS_MCP_WRITE env var opts in to writes.
 
     Accepts ``true``/``1``/``yes`` (case-insensitive, whitespace-trimmed).
@@ -65,9 +65,7 @@ def is_write_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
     return normalized in {"true", "1", "yes"}
 
 
-def filter_tools(
-    tools: Sequence, env: Optional[Mapping[str, str]] = None
-) -> list:
+def filter_tools(tools: Sequence, env: Mapping[str, str] | None = None) -> list:
     """Return tools visible under the current write-mode setting.
 
     When writes are disabled, every tool whose ``.name`` is in
@@ -79,9 +77,7 @@ def filter_tools(
     return [t for t in tools if getattr(t, "name", None) not in WRITE_TOOLS]
 
 
-def assert_write_allowed(
-    name: str, env: Optional[Mapping[str, str]] = None
-) -> None:
+def assert_write_allowed(name: str, env: Mapping[str, str] | None = None) -> None:
     """Raise ``PermissionError`` if ``name`` is a write tool and writes are off.
 
     No-op for read-only tools and when writes are enabled.
@@ -90,12 +86,10 @@ def assert_write_allowed(
         return
     if is_write_enabled(env):
         return
-    raise PermissionError(
-        f'Tool "{name}" is a write operation. {WRITE_DISABLED_MESSAGE}'
-    )
+    raise PermissionError(f'Tool "{name}" is a write operation. {WRITE_DISABLED_MESSAGE}')
 
 
-def install_write_gate(mcp_server: Any, logger: Optional[logging.Logger] = None) -> None:
+def install_write_gate(mcp_server: Any, logger: logging.Logger | None = None) -> None:
     """Wrap FastMCP ``list_tools`` and ``call_tool`` with the write gate.
 
     FastMCP registers low-level MCP request handlers by binding

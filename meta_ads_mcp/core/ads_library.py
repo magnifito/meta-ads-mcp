@@ -2,24 +2,24 @@
 
 import json
 import os
-from typing import Optional, List, Dict, Any
-from .api import meta_api_tool, make_api_request
-from .server import mcp_server
 
+from .api import make_api_request, meta_api_tool
+from .server import mcp_server
 
 # Only register the search_ads_archive function if the environment variable is NOT set
 DISABLE_ADS_LIBRARY = bool(os.environ.get("META_ADS_DISABLE_ADS_LIBRARY", ""))
 
 if not DISABLE_ADS_LIBRARY:
+
     @mcp_server.tool()
     @meta_api_tool
     async def search_ads_archive(
         search_terms: str,
-        ad_reached_countries: List[str],
-        access_token: Optional[str] = None,
+        ad_reached_countries: list[str],
+        access_token: str | None = None,
         ad_type: str = "ALL",
         limit: int = 25,  # Default limit, adjust as needed
-        fields: str = "ad_creation_time,ad_creative_body,ad_creative_link_caption,ad_creative_link_description,ad_creative_link_title,ad_delivery_start_time,ad_delivery_stop_time,ad_snapshot_url,currency,demographic_distribution,funding_entity,impressions,page_id,page_name,publisher_platform,region_distribution,spend"
+        fields: str = "ad_creation_time,ad_creative_body,ad_creative_link_caption,ad_creative_link_description,ad_creative_link_title,ad_delivery_start_time,ad_delivery_stop_time,ad_snapshot_url,currency,demographic_distribution,funding_entity,impressions,page_id,page_name,publisher_platform,region_distribution,spend",
     ) -> str:
         """
         Search the Facebook Ads Library archive.
@@ -55,7 +55,7 @@ if not DISABLE_ADS_LIBRARY:
         params = {
             "search_terms": search_terms,
             "ad_type": ad_type,
-            "ad_reached_countries": json.dumps(ad_reached_countries), # API expects a JSON array string
+            "ad_reached_countries": json.dumps(ad_reached_countries),  # API expects a JSON array string
             "limit": limit,
             "fields": fields,
         }
@@ -67,8 +67,11 @@ if not DISABLE_ADS_LIBRARY:
             error_msg = str(e)
             # Consider logging the full error for debugging
             # print(f"Error calling Ads Library API: {error_msg}")
-            return json.dumps({
-                "error": "Failed to search ads archive",
-                "details": error_msg,
-                "params_sent": {k: v for k, v in params.items() if k != 'access_token'} # Avoid logging token
-            }, indent=2) 
+            return json.dumps(
+                {
+                    "error": "Failed to search ads archive",
+                    "details": error_msg,
+                    "params_sent": {k: v for k, v in params.items() if k != "access_token"},  # Avoid logging token
+                },
+                indent=2,
+            )

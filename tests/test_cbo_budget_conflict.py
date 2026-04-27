@@ -14,9 +14,10 @@ Usage:
     uv run python -m pytest tests/test_cbo_budget_conflict.py -v
 """
 
-import pytest
 import json
-from unittest.mock import AsyncMock, patch, call
+from unittest.mock import AsyncMock, call, patch
+
+import pytest
 
 from meta_ads_mcp.core.adsets import create_adset
 
@@ -98,16 +99,12 @@ class TestCboBudgetConflict:
     """Tests for CBO budget conflict detection in create_adset."""
 
     @pytest.mark.asyncio
-    async def test_daily_budget_with_cbo_campaign_returns_error(
-        self, basic_adset_params, cbo_campaign_response
-    ):
+    async def test_daily_budget_with_cbo_campaign_returns_error(self, basic_adset_params, cbo_campaign_response):
         """
         When daily_budget is provided and the campaign already has a daily_budget,
         create_adset should return a clear error before calling the create endpoint.
         """
-        with patch(
-            "meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock
-        ) as mock_api:
+        with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = cbo_campaign_response
 
             result = await create_adset(**basic_adset_params, daily_budget=5000)
@@ -130,9 +127,7 @@ class TestCboBudgetConflict:
         """
         lifetime_budget on the ad set also conflicts with a CBO campaign.
         """
-        with patch(
-            "meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock
-        ) as mock_api:
+        with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = cbo_campaign_response
 
             result = await create_adset(**basic_adset_params, lifetime_budget=50000)
@@ -151,9 +146,7 @@ class TestCboBudgetConflict:
         When the campaign has a lifetime_budget (CBO), providing lifetime_budget
         on the ad set should also be caught.
         """
-        with patch(
-            "meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock
-        ) as mock_api:
+        with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = cbo_campaign_lifetime_response
 
             result = await create_adset(**basic_adset_params, lifetime_budget=50000)
@@ -172,9 +165,7 @@ class TestCboBudgetConflict:
         When the campaign has no budget (ABO mode), providing daily_budget on the
         ad set is valid and the create request should proceed normally.
         """
-        with patch(
-            "meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock
-        ) as mock_api:
+        with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
             # First call: campaign check → ABO (no budget)
             # Second call: adset create → success
             mock_api.side_effect = [abo_campaign_response, adset_created_response]
@@ -201,9 +192,7 @@ class TestCboBudgetConflict:
         When no budget is provided for the ad set (standard CBO usage),
         create_adset should proceed without any conflict check error.
         """
-        with patch(
-            "meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock
-        ) as mock_api:
+        with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
             # First call: campaign check (needed for bid_amount check; no budget provided)
             # Second call: adset create
             mock_api.side_effect = [cbo_campaign_response, adset_created_response]
@@ -216,16 +205,12 @@ class TestCboBudgetConflict:
         assert result_data["id"] == "adset_999888777"
 
     @pytest.mark.asyncio
-    async def test_error_includes_campaign_name(
-        self, basic_adset_params, cbo_campaign_response
-    ):
+    async def test_error_includes_campaign_name(self, basic_adset_params, cbo_campaign_response):
         """
         The error message should include the campaign name to help the user identify
         which campaign triggered the conflict.
         """
-        with patch(
-            "meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock
-        ) as mock_api:
+        with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = cbo_campaign_response
 
             result = await create_adset(**basic_adset_params, daily_budget=5000)
@@ -236,15 +221,11 @@ class TestCboBudgetConflict:
         assert "My CBO Campaign" in result_data["error"]
 
     @pytest.mark.asyncio
-    async def test_error_includes_campaign_id(
-        self, basic_adset_params, cbo_campaign_response
-    ):
+    async def test_error_includes_campaign_id(self, basic_adset_params, cbo_campaign_response):
         """
         The error message should include the campaign ID so the user can look it up.
         """
-        with patch(
-            "meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock
-        ) as mock_api:
+        with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = cbo_campaign_response
 
             result = await create_adset(**basic_adset_params, daily_budget=5000)
@@ -254,15 +235,11 @@ class TestCboBudgetConflict:
         assert basic_adset_params["campaign_id"] in result_data["error"]
 
     @pytest.mark.asyncio
-    async def test_error_includes_fix_instructions(
-        self, basic_adset_params, cbo_campaign_response
-    ):
+    async def test_error_includes_fix_instructions(self, basic_adset_params, cbo_campaign_response):
         """
         The error response should include a 'fix' field explaining how to resolve it.
         """
-        with patch(
-            "meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock
-        ) as mock_api:
+        with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = cbo_campaign_response
 
             result = await create_adset(**basic_adset_params, daily_budget=5000)
@@ -275,16 +252,12 @@ class TestCboBudgetConflict:
         assert "daily_budget" in fix_text or "budget" in fix_text.lower()
 
     @pytest.mark.asyncio
-    async def test_error_includes_alternative(
-        self, basic_adset_params, cbo_campaign_response
-    ):
+    async def test_error_includes_alternative(self, basic_adset_params, cbo_campaign_response):
         """
         The error response should include an 'alternative' field for users who
         actually want ABO (ad set-level budgets).
         """
-        with patch(
-            "meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock
-        ) as mock_api:
+        with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = cbo_campaign_response
 
             result = await create_adset(**basic_adset_params, daily_budget=5000)
@@ -294,16 +267,12 @@ class TestCboBudgetConflict:
         assert "alternative" in result_data
 
     @pytest.mark.asyncio
-    async def test_campaign_check_failure_falls_through_to_create(
-        self, basic_adset_params, adset_created_response
-    ):
+    async def test_campaign_check_failure_falls_through_to_create(self, basic_adset_params, adset_created_response):
         """
         If the campaign pre-flight check itself fails (e.g., network error, permission),
         create_adset should fall through and attempt the create call normally.
         """
-        with patch(
-            "meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock
-        ) as mock_api:
+        with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
             # First call: campaign check fails
             # Second call: adset create succeeds
             mock_api.side_effect = [Exception("Network error"), adset_created_response]
@@ -320,16 +289,12 @@ class TestCboBudgetConflict:
         assert mock_api.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_no_budget_no_bid_amount_with_campaign_bid_cap_strategy(
-        self, basic_adset_params
-    ):
+    async def test_no_budget_no_bid_amount_with_campaign_bid_cap_strategy(self, basic_adset_params):
         """
         Regression: when no budget is provided but campaign uses LOWEST_COST_WITH_BID_CAP,
         the bid strategy check should still fire (original behavior preserved).
         """
-        with patch(
-            "meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock
-        ) as mock_api:
+        with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = {
                 "id": "campaign_111222333",
                 "name": "Bid Cap Campaign",
@@ -353,9 +318,7 @@ class TestCboBudgetConflict:
         The error message should identify which budget type (daily vs lifetime) is
         set on the campaign.
         """
-        with patch(
-            "meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock
-        ) as mock_api:
+        with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
             # CBO campaign with daily_budget
             mock_api.return_value = cbo_campaign_response  # has daily_budget
 
@@ -373,9 +336,7 @@ class TestCboBudgetConflict:
         The error message should identify 'lifetime_budget' when that's what the
         campaign has set.
         """
-        with patch(
-            "meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock
-        ) as mock_api:
+        with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = cbo_campaign_lifetime_response  # has lifetime_budget
 
             result = await create_adset(**basic_adset_params, daily_budget=5000)
@@ -392,9 +353,7 @@ class TestCboBudgetConflict:
         The campaign pre-flight check should request daily_budget and lifetime_budget
         fields so it can detect CBO mode.
         """
-        with patch(
-            "meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock
-        ) as mock_api:
+        with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.side_effect = [abo_campaign_response, adset_created_response]
 
             await create_adset(**basic_adset_params, daily_budget=5000)

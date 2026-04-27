@@ -1,19 +1,20 @@
 """Tests for object_story_id support in create_ad_creative and bulk_create_ad_creatives."""
 
 import json
-import pytest
 from unittest.mock import AsyncMock, patch
 
-from meta_ads_mcp.core.ads import (
-    create_ad_creative,
-    _translate_video_customization_rules_for_existing_post,
-    _ALL_ENHANCEMENT_KEYS,
-)
+import pytest
 
+from meta_ads_mcp.core.ads import (
+    _ALL_ENHANCEMENT_KEYS,
+    _translate_video_customization_rules_for_existing_post,
+    create_ad_creative,
+)
 
 # ---------------------------------------------------------------------------
 # Unit tests for _translate_video_customization_rules_for_existing_post
 # ---------------------------------------------------------------------------
+
 
 def test_translate_video_rules_story_placement():
     """Translates STORY placement_groups to Meta API positions."""
@@ -79,6 +80,7 @@ def test_translate_video_rules_empty():
 # ---------------------------------------------------------------------------
 # create_ad_creative: object_story_id basic path
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_create_ad_creative_object_story_id_simple():
@@ -200,8 +202,10 @@ async def test_create_ad_creative_object_story_id_no_media_required():
 @pytest.mark.asyncio
 async def test_create_ad_creative_object_story_id_no_page_required():
     """object_story_id bypasses page_id discovery."""
-    with patch("meta_ads_mcp.core.ads.make_api_request") as mock_api, \
-         patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover:
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
         mock_api.side_effect = [
             {"id": "creative_osi_5"},
             {"id": "creative_osi_5", "status": "ACTIVE"},
@@ -224,18 +228,21 @@ async def test_create_ad_creative_object_story_id_no_page_required():
 # create_ad_creative: disable_all_enhancements
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_create_ad_creative_disable_all_enhancements():
     """disable_all_enhancements=True sets every individual enhancement key to OPT_OUT."""
-    with patch("meta_ads_mcp.core.ads.make_api_request") as mock_api, \
-         patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover:
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
         mock_discover.return_value = {"success": True, "page_id": "111", "page_name": "Test"}
         mock_api.side_effect = [
             {"id": "creative_dae_1"},
             {"id": "creative_dae_1", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             image_hash="test_hash",
             link_url="https://example.com",
@@ -263,7 +270,7 @@ async def test_create_ad_creative_object_story_id_with_disable_enhancements():
             {"id": "creative_osi_dae", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             object_story_id="124965744226834_3888007311337206",
             call_to_action_type="SEE_MENU",

@@ -1,6 +1,7 @@
 import json
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from meta_ads_mcp.core.adsets import create_adset, update_adset
 
@@ -10,7 +11,7 @@ async def test_create_adset_includes_multi_advertiser_ads_opt_out():
     """multi_advertiser_ads=0 should be sent as string '0' in POST params."""
     sample_response = {"id": "adset_1"}
 
-    with patch('meta_ads_mcp.core.adsets.make_api_request', new_callable=AsyncMock) as mock_api:
+    with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
         mock_api.return_value = sample_response
 
         result = await create_adset(
@@ -34,7 +35,7 @@ async def test_create_adset_includes_multi_advertiser_ads_opt_in():
     """multi_advertiser_ads=1 should be sent as string '1' in POST params."""
     sample_response = {"id": "adset_2"}
 
-    with patch('meta_ads_mcp.core.adsets.make_api_request', new_callable=AsyncMock) as mock_api:
+    with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
         mock_api.return_value = sample_response
 
         result = await create_adset(
@@ -58,7 +59,7 @@ async def test_create_adset_omits_multi_advertiser_ads_when_none():
     """When multi_advertiser_ads is not provided, it should not appear in params."""
     sample_response = {"id": "adset_3"}
 
-    with patch('meta_ads_mcp.core.adsets.make_api_request', new_callable=AsyncMock) as mock_api:
+    with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
         mock_api.return_value = sample_response
 
         await create_adset(
@@ -80,7 +81,7 @@ async def test_create_adset_multi_advertiser_ads_coexists_with_other_params():
     """multi_advertiser_ads should coexist with other optional params."""
     sample_response = {"id": "adset_4"}
 
-    with patch('meta_ads_mcp.core.adsets.make_api_request', new_callable=AsyncMock) as mock_api:
+    with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
         mock_api.return_value = sample_response
 
         await create_adset(
@@ -107,7 +108,7 @@ async def test_update_adset_includes_multi_advertiser_ads():
     """update_adset should pass multi_advertiser_ads as string in params."""
     sample_response = {"success": True}
 
-    with patch('meta_ads_mcp.core.adsets.make_api_request', new_callable=AsyncMock) as mock_api:
+    with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
         mock_api.return_value = sample_response
 
         result = await update_adset(
@@ -126,7 +127,7 @@ async def test_update_adset_omits_multi_advertiser_ads_when_none():
     """When multi_advertiser_ads is not provided to update_adset, it should not appear in params."""
     sample_response = {"success": True}
 
-    with patch('meta_ads_mcp.core.adsets.make_api_request', new_callable=AsyncMock) as mock_api:
+    with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
         mock_api.return_value = sample_response
 
         await update_adset(

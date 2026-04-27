@@ -3,8 +3,8 @@
 import json
 import logging
 import os
-from typing import Optional, Dict, Any
-from .api import meta_api_tool, make_api_request, ensure_act_prefix
+
+from .api import ensure_act_prefix, make_api_request, meta_api_tool
 from .server import mcp_server
 
 logger = logging.getLogger(__name__)
@@ -13,8 +13,22 @@ logger = logging.getLogger(__name__)
 # Meta API returns amount_spent and balance as integers in the smallest currency
 # unit, which is cents for most currencies but the base unit for these.
 _ZERO_DECIMAL_CURRENCIES = {
-    "BIF", "CLP", "DJF", "GNF", "JPY", "KMF", "KRW", "MGA",
-    "PYG", "RWF", "UGX", "VND", "VUV", "XAF", "XOF", "XPF",
+    "BIF",
+    "CLP",
+    "DJF",
+    "GNF",
+    "JPY",
+    "KMF",
+    "KRW",
+    "MGA",
+    "PYG",
+    "RWF",
+    "UGX",
+    "VND",
+    "VUV",
+    "XAF",
+    "XOF",
+    "XPF",
 }
 
 
@@ -45,7 +59,7 @@ def _normalize_account_monetary_fields(account: dict) -> dict:
 
 @mcp_server.tool()
 @meta_api_tool
-async def get_ad_accounts(access_token: Optional[str] = None, user_id: str = "me", limit: int = 200) -> str:
+async def get_ad_accounts(access_token: str | None = None, user_id: str = "me", limit: int = 200) -> str:
     """
     Get ad accounts accessible by a user.
 
@@ -101,10 +115,10 @@ async def get_ad_accounts(access_token: Optional[str] = None, user_id: str = "me
 
 @mcp_server.tool()
 @meta_api_tool
-async def get_account_info(account_id: str, access_token: Optional[str] = None) -> str:
+async def get_account_info(account_id: str, access_token: str | None = None) -> str:
     """
     Get detailed information about a specific ad account.
-    
+
     Args:
         account_id: Meta Ads account ID (format: act_XXXXXXXXX)
         access_token: Meta API access token (optional - will use cached token if not provided)
@@ -114,18 +128,18 @@ async def get_account_info(account_id: str, access_token: Optional[str] = None) 
             "error": {
                 "message": "Account ID is required",
                 "details": "Please specify an account_id parameter",
-                "example": "Use account_id='act_123456789' or account_id='123456789'"
+                "example": "Use account_id='act_123456789' or account_id='123456789'",
             }
         }
-    
+
     account_id = ensure_act_prefix(account_id)
-    
+
     # Try to get the account info directly first
     endpoint = f"{account_id}"
     params = {
         "fields": "id,name,account_id,account_status,amount_spent,balance,currency,age,business_city,business_country_code,timezone_name"
     }
-    
+
     data = await make_api_request(endpoint, access_token, params)
 
     # Check if the API request returned an error
@@ -136,13 +150,13 @@ async def get_account_info(account_id: str, access_token: Optional[str] = None) 
             accessible_endpoint = "me/adaccounts"
             accessible_params = {
                 "fields": "id,name,account_id,account_status,amount_spent,balance,currency,age,business_city,business_country_code",
-                "limit": 50
+                "limit": 50,
             }
             accessible_accounts_data = await make_api_request(accessible_endpoint, access_token, accessible_params)
-            
+
             if "data" in accessible_accounts_data:
                 accessible_accounts = [
-                    {"id": acc["id"], "name": acc["name"]} 
+                    {"id": acc["id"], "name": acc["name"]}
                     for acc in accessible_accounts_data["data"][:10]  # Show first 10
                 ]
                 return {
@@ -151,13 +165,13 @@ async def get_account_info(account_id: str, access_token: Optional[str] = None) 
                         "details": "This account either doesn't exist or you don't have permission to access it",
                         "accessible_accounts": accessible_accounts,
                         "total_accessible_accounts": len(accessible_accounts_data["data"]),
-                        "suggestion": "Try using one of the accessible account IDs listed above"
+                        "suggestion": "Try using one of the accessible account IDs listed above",
                     }
                 }
-        
+
         # Return the original error for non-permission related issues
         return data
-    
+
     _normalize_account_monetary_fields(data)
 
     # Add DSA requirement detection
@@ -169,5 +183,5 @@ async def get_account_info(account_id: str, access_token: Optional[str] = None) 
         else:
             data["dsa_required"] = False
             data["dsa_compliance_note"] = "This account is not subject to European DSA requirements"
-    
-    return data 
+
+    return data

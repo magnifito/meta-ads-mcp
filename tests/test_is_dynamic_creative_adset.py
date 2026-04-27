@@ -1,14 +1,15 @@
 import json
-import pytest
 from unittest.mock import AsyncMock, patch
 
-from meta_ads_mcp.core.adsets import create_adset, update_adset, get_adsets, get_adset_details
+import pytest
+
+from meta_ads_mcp.core.adsets import create_adset, get_adset_details, get_adsets, update_adset
 
 
 @pytest.mark.asyncio
 async def test_create_adset_includes_is_dynamic_creative_true():
     sample_response = {"id": "adset_1", "name": "DC Adset"}
-    with patch('meta_ads_mcp.core.adsets.make_api_request', new_callable=AsyncMock) as mock_api:
+    with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
         mock_api.return_value = sample_response
 
         result = await create_adset(
@@ -32,7 +33,7 @@ async def test_create_adset_includes_is_dynamic_creative_true():
 @pytest.mark.asyncio
 async def test_update_adset_includes_is_dynamic_creative_false():
     sample_response = {"success": True}
-    with patch('meta_ads_mcp.core.adsets.make_api_request', new_callable=AsyncMock) as mock_api:
+    with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
         mock_api.return_value = sample_response
 
         result = await update_adset(
@@ -50,7 +51,7 @@ async def test_update_adset_includes_is_dynamic_creative_false():
 @pytest.mark.asyncio
 async def test_get_adsets_fields_include_is_dynamic_creative():
     sample_response = {"data": []}
-    with patch('meta_ads_mcp.core.adsets.make_api_request', new_callable=AsyncMock) as mock_api:
+    with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
         mock_api.return_value = sample_response
 
         result = await get_adsets(account_id="act_123", access_token="test_token", limit=1)
@@ -64,7 +65,7 @@ async def test_get_adsets_fields_include_is_dynamic_creative():
 @pytest.mark.asyncio
 async def test_get_adset_details_fields_include_is_dynamic_creative():
     sample_response = {"id": "120", "name": "Test", "is_dynamic_creative": True}
-    with patch('meta_ads_mcp.core.adsets.make_api_request', new_callable=AsyncMock) as mock_api:
+    with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
         mock_api.return_value = sample_response
 
         result = await get_adset_details(adset_id="120", access_token="test_token")
@@ -73,5 +74,3 @@ async def test_get_adset_details_fields_include_is_dynamic_creative():
         call_args = mock_api.call_args
         params = call_args[0][2]
         assert "is_dynamic_creative" in params.get("fields", "")
-
-

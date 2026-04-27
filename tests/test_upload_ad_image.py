@@ -110,8 +110,10 @@ async def test_upload_ad_image_from_url_infers_name_and_prefixes_account_id():
         }
     }
 
-    with patch("meta_ads_mcp.core.ads.try_multiple_download_methods", new_callable=AsyncMock) as mock_dl, \
-         patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
+    with (
+        patch("meta_ads_mcp.core.ads.try_multiple_download_methods", new_callable=AsyncMock) as mock_dl,
+        patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api,
+    ):
         mock_dl.return_value = b"\xff\xd8\xff"  # minimal JPEG header bytes
         mock_api.return_value = mock_response
 
@@ -130,5 +132,3 @@ async def test_upload_ad_image_from_url_infers_name_and_prefixes_account_id():
         # Primary hash should be derived from key when nested hash missing
         assert result.get("image_hash") == "hash999"
         assert result.get("images_count") == 1
-
-

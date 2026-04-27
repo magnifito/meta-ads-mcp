@@ -2,7 +2,7 @@
 
 A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for interacting with Meta Ads. Analyze, manage and optimize Meta advertising campaigns through an AI interface. Use an LLM to retrieve performance data, visualize ad creatives, and provide strategic insights for your ads on Facebook, Instagram, and other Meta platforms.
 
-> **Note:** This is an independent open-source project that uses Meta's public APIs. If you're looking for an officially approved Meta app, check out [Pipeboard](https://pipeboard.co). Meta, Facebook, Instagram, and other Meta brand names are trademarks of their respective owners.
+> **Note:** Independent open-source project that uses Meta's public APIs. Meta, Facebook, Instagram, and other Meta brand names are trademarks of their respective owners.
 
 This fork is maintained for local use: it runs as a stdio MCP process on your own machine and authenticates directly against the Meta Graph API using either a System User access token or a local OAuth flow. There is no cloud relay in this build.
 

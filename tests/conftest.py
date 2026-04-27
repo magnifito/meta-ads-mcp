@@ -4,18 +4,17 @@ Pytest configuration for Meta Ads MCP tests
 This file provides common fixtures and configuration for all tests.
 """
 
+import os
+import time
+
 import pytest
 import requests
-import time
-import os
 
 
 @pytest.fixture(autouse=True)
 def _isolate_auth_env(monkeypatch):
-    """Defensive: make sure no stray env var from the dev shell leaks into
-    tests. Specifically keep PIPEBOARD_API_TOKEN unset so any residue in
-    module state from a previous removal of pipeboard support is flagged
-    rather than silently re-enabled."""
+    """Defensive: prevent stray dev-shell env vars from re-enabling removed
+    cloud-relay code paths during tests."""
     monkeypatch.delenv("PIPEBOARD_API_TOKEN", raising=False)
 
 
@@ -29,7 +28,7 @@ def server_url():
 def check_server_running(server_url):
     """
     Check if the MCP server is running before running tests.
-    
+
     This fixture will skip tests if the server is not available.
     """
     try:
@@ -40,8 +39,7 @@ def check_server_running(server_url):
         return True
     except requests.exceptions.RequestException:
         pytest.skip(
-            f"MCP server not running at {server_url}. "
-            f"Start with: python -m meta_ads_mcp --transport streamable-http"
+            f"MCP server not running at {server_url}. Start with: python -m meta_ads_mcp --transport streamable-http"
         )
 
 
@@ -51,7 +49,7 @@ def test_headers():
     return {
         "Content-Type": "application/json",
         "Accept": "application/json, text/event-stream",
-        "User-Agent": "MCP-Test-Client/1.0"
+        "User-Agent": "MCP-Test-Client/1.0",
     }
 
 

@@ -2,27 +2,27 @@
 
 import json
 import os
-from typing import Optional, Dict, Any, List, Union
-from .api import meta_api_tool, ensure_act_prefix
-from .server import mcp_server
 
+from .api import ensure_act_prefix
+from .server import mcp_server
 
 # Only register the generate_report function if the environment variable is set
 ENABLE_REPORT_GENERATION = bool(os.environ.get("META_ADS_ENABLE_REPORTS", ""))
 
 if ENABLE_REPORT_GENERATION:
+
     @mcp_server.tool()
     async def generate_report(
         account_id: str,
-        access_token: Optional[str] = None,
+        access_token: str | None = None,
         report_type: str = "account",
         time_range: str = "last_30d",
-        campaign_ids: Optional[List[str]] = None,
+        campaign_ids: list[str] | None = None,
         export_format: str = "pdf",
-        report_name: Optional[str] = None,
-        include_sections: Optional[List[str]] = None,
-        breakdowns: Optional[List[str]] = None,
-        comparison_period: Optional[str] = None
+        report_name: str | None = None,
+        include_sections: list[str] | None = None,
+        breakdowns: list[str] | None = None,
+        comparison_period: str | None = None,
     ) -> str:
         """
         Generate comprehensive Meta Ads performance reports.
@@ -43,82 +43,85 @@ if ENABLE_REPORT_GENERATION:
             breakdowns: Audience breakdown dimensions (age, gender, country, etc.)
             comparison_period: Time period for comparison analysis
         """
-        
+
         # Validate required parameters
         if not account_id:
-            return json.dumps({
-                "error": "invalid_parameters",
-                "message": "Account ID is required",
-                "details": {
-                    "required_parameter": "account_id",
-                    "format": "act_XXXXXXXXX"
-                }
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": "invalid_parameters",
+                    "message": "Account ID is required",
+                    "details": {"required_parameter": "account_id", "format": "act_XXXXXXXXX"},
+                },
+                indent=2,
+            )
 
         account_id = ensure_act_prefix(account_id)
 
         # For campaign and comparison reports, campaign_ids are required
         if report_type in ["campaign", "comparison"] and not campaign_ids:
-            return json.dumps({
-                "error": "invalid_parameters", 
-                "message": f"Campaign IDs are required for {report_type} reports",
-                "details": {
-                    "required_parameter": "campaign_ids",
-                    "format": "Array of campaign ID strings"
-                }
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": "invalid_parameters",
+                    "message": f"Campaign IDs are required for {report_type} reports",
+                    "details": {"required_parameter": "campaign_ids", "format": "Array of campaign ID strings"},
+                },
+                indent=2,
+            )
 
         # Report generation is not implemented in this local build.
-        return json.dumps({
-            "error": "not_implemented",
-            "message": "Report generation is not implemented in this build.",
-            "details": {
-                "feature": "Automated PDF Report Generation",
-                "description": "This tool is a stub. Wire up your own report backend if you need it.",
-            },
-            "request_parameters": {
-                "account_id": account_id,
-                "report_type": report_type,
-                "time_range": time_range,
-                "export_format": export_format,
-                "campaign_ids": campaign_ids or [],
-                "include_sections": include_sections or [],
-                "breakdowns": breakdowns or []
-            },
-            "preview": {
-                "available_data": {
-                    "account_name": f"Account {account_id}",
-                    "campaigns_count": len(campaign_ids) if campaign_ids else "All campaigns",
+        return json.dumps(
+            {
+                "error": "not_implemented",
+                "message": "Report generation is not implemented in this build.",
+                "details": {
+                    "feature": "Automated PDF Report Generation",
+                    "description": "This tool is a stub. Wire up your own report backend if you need it.",
+                },
+                "request_parameters": {
+                    "account_id": account_id,
+                    "report_type": report_type,
                     "time_range": time_range,
-                    "estimated_report_pages": 8 if report_type == "account" else 6,
-                    "report_format": export_format.upper()
+                    "export_format": export_format,
+                    "campaign_ids": campaign_ids or [],
+                    "include_sections": include_sections or [],
+                    "breakdowns": breakdowns or [],
                 },
-                "sample_metrics": {
-                    "total_spend": "$12,450",
-                    "total_impressions": "2.3M", 
-                    "total_clicks": "45.2K",
-                    "average_cpc": "$0.85",
-                    "average_cpm": "$15.20",
-                    "click_through_rate": "1.96%",
-                    "roas": "4.2x"
+                "preview": {
+                    "available_data": {
+                        "account_name": f"Account {account_id}",
+                        "campaigns_count": len(campaign_ids) if campaign_ids else "All campaigns",
+                        "time_range": time_range,
+                        "estimated_report_pages": 8 if report_type == "account" else 6,
+                        "report_format": export_format.upper(),
+                    },
+                    "sample_metrics": {
+                        "total_spend": "$12,450",
+                        "total_impressions": "2.3M",
+                        "total_clicks": "45.2K",
+                        "average_cpc": "$0.85",
+                        "average_cpm": "$15.20",
+                        "click_through_rate": "1.96%",
+                        "roas": "4.2x",
+                    },
+                    "available_sections": [
+                        "executive_summary",
+                        "performance_overview",
+                        "campaign_breakdown",
+                        "audience_insights",
+                        "creative_performance",
+                        "recommendations",
+                        "appendix",
+                    ],
+                    "supported_breakdowns": [
+                        "age",
+                        "gender",
+                        "country",
+                        "region",
+                        "placement",
+                        "device_platform",
+                        "publisher_platform",
+                    ],
                 },
-                "available_sections": [
-                    "executive_summary",
-                    "performance_overview", 
-                    "campaign_breakdown",
-                    "audience_insights",
-                    "creative_performance",
-                    "recommendations",
-                    "appendix"
-                ],
-                "supported_breakdowns": [
-                    "age",
-                    "gender", 
-                    "country",
-                    "region",
-                    "placement",
-                    "device_platform",
-                    "publisher_platform"
-                ]
-            }
-        }, indent=2) 
+            },
+            indent=2,
+        )

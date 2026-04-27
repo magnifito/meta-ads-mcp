@@ -1,8 +1,10 @@
 """Test get_creative_details tool."""
 
-import pytest
 import json
 from unittest.mock import patch
+
+import pytest
+
 from meta_ads_mcp.core.ads import get_creative_details
 
 
@@ -48,9 +50,7 @@ async def test_get_creative_details_returns_fields():
     with patch("meta_ads_mcp.core.ads.make_api_request") as mock_api:
         mock_api.side_effect = [mock_main_response, mock_dcs_response, mock_dof_response, mock_product_set_response]
 
-        result = await get_creative_details(
-            creative_id="creative_123", access_token="test_token"
-        )
+        result = await get_creative_details(creative_id="creative_123", access_token="test_token")
 
         data = parse_result(result)
         assert data["id"] == "creative_123"
@@ -93,22 +93,14 @@ async def test_get_creative_details_without_dynamic_creative_spec():
         },
     }
     # Optional field calls fail (fields do not exist on this creative type)
-    mock_dcs_error = {
-        "error": {"message": "Tried accessing nonexisting field", "code": 100}
-    }
-    mock_dof_error = {
-        "error": {"message": "Tried accessing nonexisting field", "code": 100}
-    }
-    mock_ps_error = {
-        "error": {"message": "Tried accessing nonexisting field", "code": 100}
-    }
+    mock_dcs_error = {"error": {"message": "Tried accessing nonexisting field", "code": 100}}
+    mock_dof_error = {"error": {"message": "Tried accessing nonexisting field", "code": 100}}
+    mock_ps_error = {"error": {"message": "Tried accessing nonexisting field", "code": 100}}
 
     with patch("meta_ads_mcp.core.ads.make_api_request") as mock_api:
         mock_api.side_effect = [mock_main_response, mock_dcs_error, mock_dof_error, mock_ps_error]
 
-        result = await get_creative_details(
-            creative_id="creative_456", access_token="test_token"
-        )
+        result = await get_creative_details(creative_id="creative_456", access_token="test_token")
 
         data = parse_result(result)
         assert data["id"] == "creative_456"
@@ -144,9 +136,7 @@ async def test_get_creative_details_dpa_with_product_set():
             mock_catalog_response,
         ]
 
-        result = await get_creative_details(
-            creative_id="creative_dpa", access_token="test_token"
-        )
+        result = await get_creative_details(creative_id="creative_dpa", access_token="test_token")
 
         data = parse_result(result)
         assert data["product_set_id"] == "ps_999"
@@ -170,13 +160,9 @@ async def test_get_creative_details_empty_id():
 async def test_get_creative_details_api_error():
     """Test that API errors are propagated."""
     with patch("meta_ads_mcp.core.ads.make_api_request") as mock_api:
-        mock_api.return_value = {
-            "error": {"message": "Invalid creative ID", "code": 100}
-        }
+        mock_api.return_value = {"error": {"message": "Invalid creative ID", "code": 100}}
 
-        result = await get_creative_details(
-            creative_id="bad_id", access_token="test_token"
-        )
+        result = await get_creative_details(creative_id="bad_id", access_token="test_token")
 
         data = parse_result(result)
         assert "error" in data

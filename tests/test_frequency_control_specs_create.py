@@ -1,6 +1,7 @@
 import json
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from meta_ads_mcp.core.adsets import create_adset
 
@@ -11,7 +12,7 @@ async def test_create_adset_includes_frequency_control_specs():
     sample_response = {"id": "adset_1", "name": "Freq Cap Adset"}
     specs = [{"event": "IMPRESSIONS", "interval_days": 7, "max_frequency": 1}]
 
-    with patch('meta_ads_mcp.core.adsets.make_api_request', new_callable=AsyncMock) as mock_api:
+    with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
         mock_api.return_value = sample_response
 
         result = await create_adset(
@@ -41,7 +42,7 @@ async def test_create_adset_frequency_control_specs_multiple_rules():
         {"event": "IMPRESSIONS", "interval_days": 1, "max_frequency": 1},
     ]
 
-    with patch('meta_ads_mcp.core.adsets.make_api_request', new_callable=AsyncMock) as mock_api:
+    with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
         mock_api.return_value = sample_response
 
         result = await create_adset(
@@ -68,7 +69,7 @@ async def test_create_adset_omits_frequency_control_specs_when_none():
     """When frequency_control_specs is not provided, it should not appear in params."""
     sample_response = {"id": "adset_3"}
 
-    with patch('meta_ads_mcp.core.adsets.make_api_request', new_callable=AsyncMock) as mock_api:
+    with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
         mock_api.return_value = sample_response
 
         await create_adset(
@@ -91,7 +92,7 @@ async def test_create_adset_frequency_control_specs_with_other_params():
     sample_response = {"id": "adset_4"}
     specs = [{"event": "IMPRESSIONS", "interval_days": 7, "max_frequency": 2}]
 
-    with patch('meta_ads_mcp.core.adsets.make_api_request', new_callable=AsyncMock) as mock_api:
+    with patch("meta_ads_mcp.core.adsets.make_api_request", new_callable=AsyncMock) as mock_api:
         mock_api.return_value = sample_response
 
         await create_adset(

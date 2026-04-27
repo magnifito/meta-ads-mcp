@@ -1,6 +1,7 @@
 import json
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from meta_ads_mcp.core.ads import create_ad_creative
 
@@ -10,9 +11,10 @@ async def test_simple_creative_includes_image_crops():
     """image_crops should appear in link_data for simple image creatives."""
     crops = {"100x100": [[0, 0], [600, 600]]}
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
         mock_discover.return_value = {
             "success": True,
             "page_id": "123456789",
@@ -43,9 +45,10 @@ async def test_dof_creative_includes_image_crops():
     """image_crops should appear in link_data for DOF/FLEX creatives."""
     crops = {"191x100": [[0, 0], [1200, 628]]}
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
         mock_discover.return_value = {
             "success": True,
             "page_id": "123456789",
@@ -75,9 +78,10 @@ async def test_dof_creative_includes_image_crops():
 @pytest.mark.asyncio
 async def test_simple_creative_omits_image_crops_when_none():
     """When image_crops is not provided, link_data should not contain it."""
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
         mock_discover.return_value = {
             "success": True,
             "page_id": "123456789",
@@ -108,9 +112,10 @@ async def test_image_crops_json_string_coercion():
     crops_str = '{"100x100": [[0, 0], [600, 600]]}'
     expected = {"100x100": [[0, 0], [600, 600]]}
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
         mock_discover.return_value = {
             "success": True,
             "page_id": "123456789",
@@ -141,9 +146,10 @@ async def test_image_crops_coexists_with_caption():
     """image_crops and caption should both appear in link_data."""
     crops = {"100x100": [[0, 0], [600, 600]]}
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
         mock_discover.return_value = {
             "success": True,
             "page_id": "123456789",

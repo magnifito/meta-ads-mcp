@@ -1,7 +1,10 @@
 """Tests for resilience module: retry, backoff, safe_response, timeout."""
+
 import asyncio
 import json
+
 import pytest
+
 from meta_ads_mcp.core.resilience import safe_response, with_resilience
 
 
@@ -62,6 +65,7 @@ class TestWithResilience:
     async def test_success_first_attempt(self):
         def fn():
             return {"success": True}
+
         result = await with_resilience(fn, operation_name="test")
         assert result == {"success": True}
 
@@ -69,17 +73,20 @@ class TestWithResilience:
     async def test_async_function_success(self):
         async def fn():
             return {"async": True}
+
         result = await with_resilience(fn, operation_name="test")
         assert result == {"async": True}
 
     @pytest.mark.asyncio
     async def test_retries_on_transient_failure(self):
         attempts = {"count": 0}
+
         def fn():
             attempts["count"] += 1
             if attempts["count"] < 2:
                 raise Exception("500 Internal Server Error")
             return {"success": True}
+
         result = await with_resilience(fn, operation_name="test")
         assert result == {"success": True}
         assert attempts["count"] == 2
@@ -87,11 +94,13 @@ class TestWithResilience:
     @pytest.mark.asyncio
     async def test_retries_on_rate_limit(self):
         attempts = {"count": 0}
+
         def fn():
             attempts["count"] += 1
             if attempts["count"] < 2:
                 raise Exception("429 Too Many Requests")
             return {"ok": True}
+
         result = await with_resilience(fn, operation_name="test")
         assert result == {"ok": True}
         assert attempts["count"] == 2
@@ -100,15 +109,18 @@ class TestWithResilience:
     async def test_fails_after_max_retries(self):
         def fn():
             raise Exception("500 Server Error")
+
         with pytest.raises(Exception, match="Server Error"):
             await with_resilience(fn, operation_name="test")
 
     @pytest.mark.asyncio
     async def test_non_retryable_fails_immediately(self):
         attempts = {"count": 0}
+
         def fn():
             attempts["count"] += 1
             raise Exception("400 invalid request")
+
         with pytest.raises(Exception, match="invalid"):
             await with_resilience(fn, operation_name="test")
         assert attempts["count"] == 1
@@ -116,9 +128,11 @@ class TestWithResilience:
     @pytest.mark.asyncio
     async def test_non_retryable_permission_fails_immediately(self):
         attempts = {"count": 0}
+
         def fn():
             attempts["count"] += 1
             raise Exception("permission denied for this resource")
+
         with pytest.raises(Exception, match="permission"):
             await with_resilience(fn, operation_name="test")
         assert attempts["count"] == 1
@@ -127,11 +141,13 @@ class TestWithResilience:
     async def test_rate_limit_in_400_retries(self):
         """A 400 that mentions 'rate' should be retried, not treated as non-retryable."""
         attempts = {"count": 0}
+
         def fn():
             attempts["count"] += 1
             if attempts["count"] < 2:
                 raise Exception("400 rate limit exceeded")
             return {"ok": True}
+
         result = await with_resilience(fn, operation_name="test")
         assert result == {"ok": True}
         assert attempts["count"] == 2
@@ -141,5 +157,6 @@ class TestWithResilience:
         async def slow_fn():
             await asyncio.sleep(60)
             return {"never": "reached"}
+
         with pytest.raises(TimeoutError):
             await with_resilience(slow_fn, operation_name="test_timeout")

@@ -1,11 +1,13 @@
 """Test that create_ad_creative handles video creatives correctly."""
 
-import pytest
 import json
 from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from meta_ads_mcp.core.ads import (
-    create_ad_creative,
     _translate_video_customization_rules,
+    create_ad_creative,
 )
 
 
@@ -26,14 +28,11 @@ def parse_error_result(result: str) -> dict:
 async def test_simple_video_creative_uses_video_data():
     """Test that video_id creates a simple creative with object_story_spec.video_data."""
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
-        mock_discover.return_value = {
-            "success": True,
-            "page_id": "123456789",
-            "page_name": "Test Page"
-        }
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
+        mock_discover.return_value = {"success": True, "page_id": "123456789", "page_name": "Test Page"}
 
         mock_api.side_effect = [
             # 1) Auto-fetch video thumbnail (no thumbnail_url provided)
@@ -41,10 +40,10 @@ async def test_simple_video_creative_uses_video_data():
             # 2) POST create creative
             {"id": "creative_vid_1"},
             # 3) GET creative details
-            {"id": "creative_vid_1", "name": "Video Creative", "status": "ACTIVE"}
+            {"id": "creative_vid_1", "name": "Video Creative", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             video_id="vid_987654",
             name="Video Ad",
@@ -54,7 +53,7 @@ async def test_simple_video_creative_uses_video_data():
             # NOTE: no description here — providing description routes to asset_feed_spec;
             # see test_video_creative_with_description for that path
             call_to_action_type="LEARN_MORE",
-            access_token="test_token"
+            access_token="test_token",
         )
 
         assert mock_api.call_count == 3
@@ -85,27 +84,24 @@ async def test_simple_video_creative_uses_video_data():
 async def test_video_creative_with_thumbnail():
     """Test that thumbnail_url is included as image_url in video_data."""
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
-        mock_discover.return_value = {
-            "success": True,
-            "page_id": "123456789",
-            "page_name": "Test Page"
-        }
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
+        mock_discover.return_value = {"success": True, "page_id": "123456789", "page_name": "Test Page"}
 
         mock_api.side_effect = [
             {"id": "creative_vid_2"},
-            {"id": "creative_vid_2", "name": "Video With Thumb", "status": "ACTIVE"}
+            {"id": "creative_vid_2", "name": "Video With Thumb", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             video_id="vid_111222",
             thumbnail_url="https://example.com/thumb.jpg",
             name="Video With Thumbnail",
             link_url="https://example.com/",
-            access_token="test_token"
+            access_token="test_token",
         )
 
         creative_data = mock_api.call_args_list[0][0][2]
@@ -128,28 +124,25 @@ async def test_video_creative_with_instagram_actor_id():
     ad_formats=["SINGLE_VIDEO"] is automatically included in the API call.
     """
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
-        mock_discover.return_value = {
-            "success": True,
-            "page_id": "123456789",
-            "page_name": "Test Page"
-        }
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
+        mock_discover.return_value = {"success": True, "page_id": "123456789", "page_name": "Test Page"}
 
         mock_api.side_effect = [
             {"picture": "https://example.com/auto-thumb.jpg"},
             {"id": "creative_vid_3"},
-            {"id": "creative_vid_3", "name": "Video IG", "status": "ACTIVE"}
+            {"id": "creative_vid_3", "name": "Video IG", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             video_id="vid_333444",
             name="Video For Instagram",
             link_url="https://example.com/",
             instagram_actor_id="ig_555666",
-            access_token="test_token"
+            access_token="test_token",
         )
 
         creative_data = mock_api.call_args_list[1][0][2]
@@ -181,21 +174,18 @@ async def test_video_creative_with_instagram_actor_id():
 async def test_video_creative_asset_feed_spec_path():
     """Test video creative with plural params triggers asset_feed_spec with videos array."""
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
-        mock_discover.return_value = {
-            "success": True,
-            "page_id": "123456789",
-            "page_name": "Test Page"
-        }
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
+        mock_discover.return_value = {"success": True, "page_id": "123456789", "page_name": "Test Page"}
 
         mock_api.side_effect = [
             {"id": "creative_vid_4"},
-            {"id": "creative_vid_4", "name": "Video FLEX", "status": "ACTIVE"}
+            {"id": "creative_vid_4", "name": "Video FLEX", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             video_id="vid_555666",
             name="Video FLEX Creative",
@@ -203,7 +193,7 @@ async def test_video_creative_asset_feed_spec_path():
             headlines=["Headline A", "Headline B"],
             messages=["Body text 1", "Body text 2"],
             thumbnail_url="https://example.com/thumb.jpg",
-            access_token="test_token"
+            access_token="test_token",
         )
 
         creative_data = mock_api.call_args_list[0][0][2]
@@ -237,14 +227,11 @@ async def test_video_creative_asset_feed_spec_path():
 async def test_video_creative_with_dof_optimization():
     """Test video creative with DEGREES_OF_FREEDOM optimization_type."""
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
-        mock_discover.return_value = {
-            "success": True,
-            "page_id": "123456789",
-            "page_name": "Test Page"
-        }
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
+        mock_discover.return_value = {"success": True, "page_id": "123456789", "page_name": "Test Page"}
 
         mock_api.side_effect = [
             # 1) Auto-fetch video thumbnail
@@ -252,17 +239,17 @@ async def test_video_creative_with_dof_optimization():
             # 2) POST create creative
             {"id": "creative_vid_5"},
             # 3) GET creative details
-            {"id": "creative_vid_5", "name": "Video DOF", "status": "ACTIVE"}
+            {"id": "creative_vid_5", "name": "Video DOF", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             video_id="vid_777888",
             name="Video DOF Creative",
             link_url="https://example.com/",
             optimization_type="DEGREES_OF_FREEDOM",
             messages=["Text variant 1", "Text variant 2"],
-            access_token="test_token"
+            access_token="test_token",
         )
 
         creative_data = mock_api.call_args_list[1][0][2]
@@ -292,7 +279,7 @@ async def test_video_and_image_hash_mutual_exclusivity():
         image_hash="hash_456",
         name="Should Fail",
         link_url="https://example.com/",
-        access_token="test_token"
+        access_token="test_token",
     )
 
     data = parse_error_result(result)
@@ -310,7 +297,7 @@ async def test_video_and_image_hashes_mutual_exclusivity():
         image_hashes=["hash_1", "hash_2"],
         name="Should Fail",
         link_url="https://example.com/",
-        access_token="test_token"
+        access_token="test_token",
     )
 
     data = parse_error_result(result)
@@ -328,7 +315,7 @@ async def test_thumbnail_without_video_returns_error():
         thumbnail_url="https://example.com/thumb.jpg",
         name="Should Fail",
         link_url="https://example.com/",
-        access_token="test_token"
+        access_token="test_token",
     )
 
     data = parse_error_result(result)
@@ -341,10 +328,7 @@ async def test_no_media_returns_error():
     """Test that providing no media source returns an error."""
 
     result = await create_ad_creative(
-        account_id="act_123456",
-        name="Should Fail",
-        link_url="https://example.com/",
-        access_token="test_token"
+        account_id="act_123456", name="Should Fail", link_url="https://example.com/", access_token="test_token"
     )
 
     data = parse_error_result(result)
@@ -356,29 +340,26 @@ async def test_no_media_returns_error():
 async def test_video_creative_with_lead_gen():
     """Test video creative with lead generation form ID."""
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
-        mock_discover.return_value = {
-            "success": True,
-            "page_id": "123456789",
-            "page_name": "Test Page"
-        }
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
+        mock_discover.return_value = {"success": True, "page_id": "123456789", "page_name": "Test Page"}
 
         mock_api.side_effect = [
             {"picture": "https://example.com/auto-thumb.jpg"},
             {"id": "creative_vid_lead"},
-            {"id": "creative_vid_lead", "name": "Video Lead Gen", "status": "ACTIVE"}
+            {"id": "creative_vid_lead", "name": "Video Lead Gen", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             video_id="vid_leadgen",
             name="Video Lead Gen Creative",
             link_url="https://example.com/",
             call_to_action_type="SIGN_UP",
             lead_gen_form_id="form_12345",
-            access_token="test_token"
+            access_token="test_token",
         )
 
         creative_data = mock_api.call_args_list[1][0][2]
@@ -394,21 +375,18 @@ async def test_video_creative_with_lead_gen():
 async def test_image_creative_still_works():
     """Regression test: existing image creative path should still work unchanged."""
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
-        mock_discover.return_value = {
-            "success": True,
-            "page_id": "123456789",
-            "page_name": "Test Page"
-        }
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
+        mock_discover.return_value = {"success": True, "page_id": "123456789", "page_name": "Test Page"}
 
         mock_api.side_effect = [
             {"id": "creative_img_1"},
-            {"id": "creative_img_1", "name": "Image Creative", "status": "ACTIVE"}
+            {"id": "creative_img_1", "name": "Image Creative", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             image_hash="hash_abc123",
             name="Image Ad",
@@ -416,7 +394,7 @@ async def test_image_creative_still_works():
             message="Click here",
             headline="Great Offer",
             call_to_action_type="SHOP_NOW",
-            access_token="test_token"
+            access_token="test_token",
         )
 
         creative_data = mock_api.call_args_list[0][0][2]
@@ -442,14 +420,11 @@ async def test_video_creative_with_description():
     for video ads, we route to asset_feed_spec when video_id + description is given.
     """
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
-        mock_discover.return_value = {
-            "success": True,
-            "page_id": "123456789",
-            "page_name": "Test Page"
-        }
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
+        mock_discover.return_value = {"success": True, "page_id": "123456789", "page_name": "Test Page"}
 
         mock_api.side_effect = [
             # 1) Auto-fetch video thumbnail
@@ -457,10 +432,10 @@ async def test_video_creative_with_description():
             # 2) POST create creative
             {"id": "creative_vid_desc"},
             # 3) GET creative details
-            {"id": "creative_vid_desc", "name": "Video With Desc", "status": "ACTIVE"}
+            {"id": "creative_vid_desc", "name": "Video With Desc", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             video_id="vid_desc_test",
             name="Video With Description",
@@ -469,7 +444,7 @@ async def test_video_creative_with_description():
             headline="Watch Now",
             description="The text below the headline in feed placements",
             call_to_action_type="LEARN_MORE",
-            access_token="test_token"
+            access_token="test_token",
         )
 
         assert mock_api.call_count == 3
@@ -506,14 +481,11 @@ async def test_video_creative_with_description():
 async def test_video_creative_description_only():
     """Test that video_id + description alone (no other plural params) still works."""
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
-        mock_discover.return_value = {
-            "success": True,
-            "page_id": "123456789",
-            "page_name": "Test Page"
-        }
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
+        mock_discover.return_value = {"success": True, "page_id": "123456789", "page_name": "Test Page"}
 
         mock_api.side_effect = [
             # 1) Auto-fetch video thumbnail
@@ -521,16 +493,16 @@ async def test_video_creative_description_only():
             # 2) POST create creative
             {"id": "creative_vid_desc2"},
             # 3) GET creative details
-            {"id": "creative_vid_desc2", "name": "Video Desc Only", "status": "ACTIVE"}
+            {"id": "creative_vid_desc2", "name": "Video Desc Only", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             video_id="vid_desc_only",
             name="Video Description Only",
             link_url="https://example.com/",
             description="Only description, no other plural params",
-            access_token="test_token"
+            access_token="test_token",
         )
 
         assert mock_api.call_count == 3
@@ -551,14 +523,11 @@ async def test_video_creative_instagram_actor_id_with_explicit_ad_formats():
     respected (not overridden) when both instagram_actor_id and video_id are present.
     """
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
-        mock_discover.return_value = {
-            "success": True,
-            "page_id": "123456789",
-            "page_name": "Test Page"
-        }
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
+        mock_discover.return_value = {"success": True, "page_id": "123456789", "page_name": "Test Page"}
 
         mock_api.side_effect = [
             # 1) Auto-fetch video thumbnail
@@ -566,17 +535,17 @@ async def test_video_creative_instagram_actor_id_with_explicit_ad_formats():
             # 2) POST create creative
             {"id": "creative_vid_ig_fmt"},
             # 3) GET creative details
-            {"id": "creative_vid_ig_fmt", "name": "Video IG Explicit Fmt", "status": "ACTIVE"}
+            {"id": "creative_vid_ig_fmt", "name": "Video IG Explicit Fmt", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             video_id="vid_explicit_fmt",
             name="Video IG Explicit Format",
             link_url="https://example.com/",
             instagram_actor_id="ig_777888",
             ad_formats=["SINGLE_VIDEO"],
-            access_token="test_token"
+            access_token="test_token",
         )
 
         creative_data = mock_api.call_args_list[1][0][2]
@@ -598,14 +567,11 @@ async def test_video_creative_without_instagram_actor_id_uses_simple_path():
     A plain video creative (no instagram_actor_id) should still use the simple path.
     """
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
-        mock_discover.return_value = {
-            "success": True,
-            "page_id": "123456789",
-            "page_name": "Test Page"
-        }
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
+        mock_discover.return_value = {"success": True, "page_id": "123456789", "page_name": "Test Page"}
 
         mock_api.side_effect = [
             # 1) Auto-fetch video thumbnail
@@ -613,16 +579,16 @@ async def test_video_creative_without_instagram_actor_id_uses_simple_path():
             # 2) POST create creative
             {"id": "creative_vid_simple"},
             # 3) GET creative details
-            {"id": "creative_vid_simple", "name": "Simple Video", "status": "ACTIVE"}
+            {"id": "creative_vid_simple", "name": "Simple Video", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             video_id="vid_simple_only",
             name="Simple Video No IG",
             link_url="https://example.com/",
             # No instagram_actor_id — should stay on simple path
-            access_token="test_token"
+            access_token="test_token",
         )
 
         creative_data = mock_api.call_args_list[1][0][2]
@@ -653,14 +619,11 @@ async def test_videos_array_does_not_trigger_thumbnail_fetch_with_none():
     asserts that no call is ever made with `None` as the first positional arg.
     """
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
-        mock_discover.return_value = {
-            "success": True,
-            "page_id": "123456789",
-            "page_name": "Test Page"
-        }
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
+        mock_discover.return_value = {"success": True, "page_id": "123456789", "page_name": "Test Page"}
 
         mock_api.side_effect = [
             # 1) Per-video thumbnail auto-fetch (videos[] branch) — uses real vid_id
@@ -671,7 +634,7 @@ async def test_videos_array_does_not_trigger_thumbnail_fetch_with_none():
             {"id": "creative_videos_arr", "name": "Videos Array Creative", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             videos=[{"video_id": "vid_videos_arr"}],  # plural form, no thumbnail_url
             name="Videos Array Test",
@@ -692,6 +655,7 @@ async def test_videos_array_does_not_trigger_thumbnail_fetch_with_none():
 # ---------------------------------------------------------------------------
 # Unit tests for _translate_video_customization_rules (videos[] path)
 # ---------------------------------------------------------------------------
+
 
 def test_translate_video_rules_placement_groups_format():
     """placement_groups + customization_spec.video_ids translates to Meta API format.
@@ -866,9 +830,10 @@ async def test_create_ad_creative_videos_with_placement_rules_sends_correct_payl
       - NO `placement_groups` key anywhere
       - NO raw `video_ids` inside customization_spec in the outgoing rules
     """
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
         mock_discover.return_value = {
             "success": True,
             "page_id": "123456789",
@@ -886,7 +851,7 @@ async def test_create_ad_creative_videos_with_placement_rules_sends_correct_payl
             {"id": "creative_vid_rules", "name": "Video Placement Rules", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             videos=[
                 {"video_id": "vidA"},
@@ -934,15 +899,11 @@ async def test_create_ad_creative_videos_with_placement_rules_sends_correct_payl
 
         # No user-facing placement_groups anywhere in outgoing payload
         for r in rules_out:
-            assert "placement_groups" not in r, (
-                f"placement_groups must not ship to Meta: {r!r}"
-            )
+            assert "placement_groups" not in r, f"placement_groups must not ship to Meta: {r!r}"
             # video_ids inside customization_spec should have been converted to
             # video_label at the rule level; raw video_ids must not ship to Meta
             cspec = r.get("customization_spec", {})
-            assert "video_ids" not in cspec, (
-                f"customization_spec.video_ids must not ship to Meta: {r!r}"
-            )
+            assert "video_ids" not in cspec, f"customization_spec.video_ids must not ship to Meta: {r!r}"
 
         # FEED rule has feed positions and video_label
         feed_rule = rules_out[0]
@@ -973,9 +934,10 @@ async def test_videos_array_auto_fetches_missing_thumbnails():
 
     Expected calls: 2 thumbnail GETs (one per video) + 1 POST creative + 1 GET details = 4.
     """
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
         mock_discover.return_value = {
             "success": True,
             "page_id": "123456789",
@@ -984,18 +946,22 @@ async def test_videos_array_auto_fetches_missing_thumbnails():
 
         mock_api.side_effect = [
             # 1) Thumbnail fetch for "a"
-            {"picture": "https://example.com/picA.jpg",
-             "thumbnails": {"data": [{"uri": "https://example.com/thumbA.jpg"}]}},
+            {
+                "picture": "https://example.com/picA.jpg",
+                "thumbnails": {"data": [{"uri": "https://example.com/thumbA.jpg"}]},
+            },
             # 2) Thumbnail fetch for "b"
-            {"picture": "https://example.com/picB.jpg",
-             "thumbnails": {"data": [{"uri": "https://example.com/thumbB.jpg"}]}},
+            {
+                "picture": "https://example.com/picB.jpg",
+                "thumbnails": {"data": [{"uri": "https://example.com/thumbB.jpg"}]},
+            },
             # 3) POST create creative
             {"id": "creative_auto_thumb"},
             # 4) GET creative details
             {"id": "creative_auto_thumb", "name": "Auto Thumb", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             videos=[{"video_id": "a"}, {"video_id": "b"}],
             name="Auto Thumb",
@@ -1037,9 +1003,10 @@ async def test_videos_array_uses_provided_thumbnails_without_fetch():
     """When every videos[] entry already has a thumbnail_url, no auto-fetch should
     happen. Only POST + GET details = 2 calls.
     """
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
         mock_discover.return_value = {
             "success": True,
             "page_id": "123456789",
@@ -1051,7 +1018,7 @@ async def test_videos_array_uses_provided_thumbnails_without_fetch():
             {"id": "creative_provided_thumb", "name": "Provided", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             videos=[
                 {"video_id": "a", "thumbnail_url": "https://x"},
@@ -1086,7 +1053,7 @@ async def test_video_thumbnail_fetch_prefers_thumbnails_uri_over_picture():
     """
     from meta_ads_mcp.core.ads import _fetch_video_thumbnail
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api:
+    with patch("meta_ads_mcp.core.ads.make_api_request") as mock_api:
         mock_api.return_value = {
             "picture": "https://example.com/placeholder-picture.jpg",
             "thumbnails": {
@@ -1111,9 +1078,10 @@ async def test_videos_array_proceeds_when_thumbnail_fetch_fails():
     path should still proceed. The entry simply ships without a thumbnail_url —
     Meta will return its own actionable error if it actually needs one.
     """
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
         mock_discover.return_value = {
             "success": True,
             "page_id": "123456789",
@@ -1129,7 +1097,7 @@ async def test_videos_array_proceeds_when_thumbnail_fetch_fails():
             {"id": "creative_fail_thumb", "name": "Fail Thumb", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_123456",
             videos=[{"video_id": "vid_no_thumb"}],
             name="Fail Thumb",

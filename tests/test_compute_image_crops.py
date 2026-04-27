@@ -4,15 +4,18 @@ Tests for the compute_image_crops tool.
 This tool is pure computation (no API calls) and should return correct
 centered crop boxes for any source image dimensions.
 """
+
 import json
 import math
-import pytest
-from meta_ads_mcp.core.ads import compute_image_crops, _compute_crop_box
 
+import pytest
+
+from meta_ads_mcp.core.ads import _compute_crop_box, compute_image_crops
 
 # ---------------------------------------------------------------------------
 # _compute_crop_box — unit tests for the math
 # ---------------------------------------------------------------------------
+
 
 class TestComputeCropBox:
     """Verify the crop box geometry for various source/target ratio combos."""
@@ -33,8 +36,8 @@ class TestComputeCropBox:
         """Assert the box is centered in the source image."""
         x1, y1 = box[0]
         x2, y2 = box[1]
-        width = x2 - x1
-        height = y2 - y1
+        x2 - x1
+        y2 - y1
         # Check symmetry: offsets on each side should differ by at most 1 pixel.
         left_pad = x1
         right_pad = src_w - x2
@@ -98,7 +101,8 @@ class TestComputeCropBox:
     def test_all_valid_keys_on_square_source(self):
         """All 6 valid keys should produce valid boxes for a 1080x1080 source."""
         from meta_ads_mcp.core.ads import _VALID_CROP_KEYS
-        for key, kw, kh in _VALID_CROP_KEYS:
+
+        for _key, kw, kh in _VALID_CROP_KEYS:
             box = _compute_crop_box(1080, 1080, kw, kh)
             self._check_ratio(box, kw, kh)
             self._check_centered(box, 1080, 1080)
@@ -117,6 +121,7 @@ class TestComputeCropBox:
 # ---------------------------------------------------------------------------
 # compute_image_crops — integration tests for the MCP tool
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_default_keys_1080x1080():
@@ -139,9 +144,7 @@ async def test_default_keys_1080x1080():
 @pytest.mark.asyncio
 async def test_specific_keys():
     """Can request a subset of keys."""
-    result_str = await compute_image_crops(
-        image_width=1080, image_height=1080, crop_keys=["100x100", "600x360"]
-    )
+    result_str = await compute_image_crops(image_width=1080, image_height=1080, crop_keys=["100x100", "600x360"])
     result = json.loads(result_str)
     assert set(result["image_crops"].keys()) == {"100x100", "600x360"}
 
@@ -149,9 +152,7 @@ async def test_specific_keys():
 @pytest.mark.asyncio
 async def test_invalid_key_produces_warning():
     """Requesting 191x100 (invalid) returns a warning and skips the key."""
-    result_str = await compute_image_crops(
-        image_width=1080, image_height=1080, crop_keys=["100x100", "191x100"]
-    )
+    result_str = await compute_image_crops(image_width=1080, image_height=1080, crop_keys=["100x100", "191x100"])
     result = json.loads(result_str)
     # 191x100 should be absent
     assert "191x100" not in result["image_crops"]

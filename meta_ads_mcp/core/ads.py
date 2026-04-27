@@ -1,19 +1,19 @@
 """Ad and Creative-related functionality for Meta Ads API."""
 
 import asyncio
+import io
 import json
 import logging
-from typing import Optional, Dict, Any, List, Union
-import io
-from PIL import Image as PILImage
-from mcp.server.fastmcp import Image
 import os
 import time
+from typing import Any
+
+from mcp.server.fastmcp import Image
+from PIL import Image as PILImage
 
 logger = logging.getLogger(__name__)
 
-from .api import meta_api_tool, make_api_request, ensure_act_prefix
-from .accounts import get_ad_accounts
+from .api import ensure_act_prefix, make_api_request, meta_api_tool
 
 # ---------------------------------------------------------------------------
 # Placement asset customization helpers
@@ -22,7 +22,7 @@ from .accounts import get_ad_accounts
 # Maps our user-friendly placement group names to Meta API positions.
 # customization_spec in Meta's API is the placement SELECTOR (WHERE),
 # while image_label/video_label at the rule level is the asset REFERENCE (WHAT).
-_PLACEMENT_GROUP_TO_POSITIONS: Dict[str, Dict[str, List[str]]] = {
+_PLACEMENT_GROUP_TO_POSITIONS: dict[str, dict[str, list[str]]] = {
     "FEED": {
         "publisher_platforms": ["facebook", "instagram"],
         "facebook_positions": ["feed"],
@@ -56,9 +56,9 @@ _PLACEMENT_GROUP_TO_POSITIONS: Dict[str, Dict[str, List[str]]] = {
 
 
 def _translate_asset_customization_rules(
-    rules: List[Dict[str, Any]],
-    images_array: List[Dict[str, Any]],
-) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    rules: list[dict[str, Any]],
+    images_array: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """
     Translate user-friendly placement_groups format to Meta API format.
 
@@ -79,7 +79,7 @@ def _translate_asset_customization_rules(
         return rules, images_array
 
     # Build hash → label mapping across all rules
-    hash_to_label: Dict[str, str] = {}
+    hash_to_label: dict[str, str] = {}
     label_counter = 0
 
     translated_rules = []
@@ -104,7 +104,7 @@ def _translate_asset_customization_rules(
             instagram_positions.update(mapping.get("instagram_positions", []))
             audience_network_positions.update(mapping.get("audience_network_positions", []))
 
-        meta_cspec: Dict[str, Any] = {}
+        meta_cspec: dict[str, Any] = {}
         if publisher_platforms:
             meta_cspec["publisher_platforms"] = sorted(publisher_platforms)
         if facebook_positions:
@@ -119,7 +119,7 @@ def _translate_asset_customization_rules(
             if text_field in cspec_input:
                 meta_cspec[text_field] = cspec_input[text_field]
 
-        translated_rule: Dict[str, Any] = {"customization_spec": meta_cspec}
+        translated_rule: dict[str, Any] = {"customization_spec": meta_cspec}
 
         # Assign label for image or video asset
         img_hashes = cspec_input.get("image_hashes", [])
@@ -154,7 +154,6 @@ def _translate_asset_customization_rules(
 
 
 # All writable creative_features_spec keys for Meta Ads API v24+.
-# Mirrors ALL_ENHANCEMENT_KEYS in pipeboard.co/lib/meta-ads-enhancement-keys.ts.
 # Setting each key to {"enroll_status": "OPT_OUT"} disables the enhancement.
 # NOTE: The legacy "standard_enhancements" key is deprecated for POST operations
 # (Meta error subcode 3858504) — individual keys must be used instead.
@@ -186,9 +185,9 @@ _ALL_ENHANCEMENT_KEYS: tuple[str, ...] = (
 
 
 def _translate_video_customization_rules(
-    rules: List[Dict[str, Any]],
-    videos_array: List[Dict[str, Any]],
-) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    rules: list[dict[str, Any]],
+    videos_array: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """
     Translate user-friendly placement_groups format to Meta API format for videos[].
 
@@ -227,7 +226,7 @@ def _translate_video_customization_rules(
     if not rules or not any("placement_groups" in r for r in rules):
         return rules, videos_array
 
-    existing_vid_to_label: Dict[str, str] = {}
+    existing_vid_to_label: dict[str, str] = {}
     for v in videos_array:
         vid_id = str(v.get("video_id", ""))
         adlabels = v.get("adlabels")
@@ -236,9 +235,9 @@ def _translate_video_customization_rules(
             if isinstance(first, dict) and isinstance(first.get("name"), str):
                 existing_vid_to_label[vid_id] = first["name"]
 
-    vid_to_label: Dict[str, str] = {}
+    vid_to_label: dict[str, str] = {}
     label_counter = 0
-    translated_rules: List[Dict[str, Any]] = []
+    translated_rules: list[dict[str, Any]] = []
 
     for rule in rules:
         if "placement_groups" not in rule:
@@ -261,7 +260,7 @@ def _translate_video_customization_rules(
             instagram_positions.update(mapping.get("instagram_positions", []))
             audience_network_positions.update(mapping.get("audience_network_positions", []))
 
-        meta_cspec: Dict[str, Any] = {}
+        meta_cspec: dict[str, Any] = {}
         if publisher_platforms:
             meta_cspec["publisher_platforms"] = sorted(publisher_platforms)
         if facebook_positions:
@@ -276,7 +275,7 @@ def _translate_video_customization_rules(
             if text_field in cspec_input:
                 meta_cspec[text_field] = cspec_input[text_field]
 
-        translated_rule: Dict[str, Any] = {"customization_spec": meta_cspec}
+        translated_rule: dict[str, Any] = {"customization_spec": meta_cspec}
 
         # Assign video_label at the rule level. Precedence:
         #   1) customization_spec.video_ids: [id] — map id → label. Reuse the
@@ -307,7 +306,7 @@ def _translate_video_customization_rules(
     # by rules. Only applies to videos without existing adlabels — explicit user
     # labels (from videos[].label) win, and the rule's video_label was already
     # aligned to that label above.
-    updated_videos: List[Dict[str, Any]] = []
+    updated_videos: list[dict[str, Any]] = []
     for v in videos_array:
         vid_id = str(v.get("video_id", ""))
         if vid_id in vid_to_label and "adlabels" not in v:
@@ -321,8 +320,8 @@ def _translate_video_customization_rules(
 
 
 def _translate_video_customization_rules_for_existing_post(
-    rules: List[Dict[str, Any]],
-) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    rules: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """
     Translate placement_groups-format customization rules to Meta API format,
     building a videos array for use alongside object_story_id.
@@ -351,7 +350,7 @@ def _translate_video_customization_rules_for_existing_post(
         # Pass through raw rules if already in Meta API format
         return rules, []
 
-    vid_to_label: Dict[str, str] = {}
+    vid_to_label: dict[str, str] = {}
     label_counter = 0
     translated_rules = []
 
@@ -376,7 +375,7 @@ def _translate_video_customization_rules_for_existing_post(
             instagram_positions.update(mapping.get("instagram_positions", []))
             audience_network_positions.update(mapping.get("audience_network_positions", []))
 
-        meta_cspec: Dict[str, Any] = {}
+        meta_cspec: dict[str, Any] = {}
         if publisher_platforms:
             meta_cspec["publisher_platforms"] = sorted(publisher_platforms)
         if facebook_positions:
@@ -391,7 +390,7 @@ def _translate_video_customization_rules_for_existing_post(
             if text_field in cspec_input:
                 meta_cspec[text_field] = cspec_input[text_field]
 
-        translated_rule: Dict[str, Any] = {"customization_spec": meta_cspec}
+        translated_rule: dict[str, Any] = {"customization_spec": meta_cspec}
 
         # Assign label for video asset
         vid_ids = cspec_input.get("video_ids", [])
@@ -405,17 +404,13 @@ def _translate_video_customization_rules_for_existing_post(
         translated_rules.append(translated_rule)
 
     # Build videos_array with adlabels
-    videos_array = [
-        {"video_id": vid_id, "adlabels": [{"name": label}]}
-        for vid_id, label in vid_to_label.items()
-    ]
+    videos_array = [{"video_id": vid_id, "adlabels": [{"name": label}]} for vid_id, label in vid_to_label.items()]
 
     return translated_rules, videos_array
 
 
-from .utils import download_image, try_multiple_download_methods, ad_creative_images, extract_creative_image_urls
 from .server import mcp_server
-
+from .utils import download_image, extract_creative_image_urls, try_multiple_download_methods
 
 # Only register the save_ad_image_locally function if explicitly enabled via environment variable
 ENABLE_SAVE_AD_IMAGE_LOCALLY = bool(os.environ.get("META_ADS_ENABLE_SAVE_AD_IMAGE_LOCALLY", ""))
@@ -423,11 +418,12 @@ ENABLE_SAVE_AD_IMAGE_LOCALLY = bool(os.environ.get("META_ADS_ENABLE_SAVE_AD_IMAG
 
 @mcp_server.tool()
 @meta_api_tool
-async def get_ads(account_id: str, access_token: Optional[str] = None, limit: int = 10, 
-                 campaign_id: str = "", adset_id: str = "") -> str:
+async def get_ads(
+    account_id: str, access_token: str | None = None, limit: int = 10, campaign_id: str = "", adset_id: str = ""
+) -> str:
     """
     Get ads for a Meta Ads account with optional filtering.
-    
+
     Args:
         account_id: Meta Ads account ID (format: act_XXXXXXXXX)
         access_token: Meta API access token (optional - will use cached token if not provided)
@@ -438,60 +434,60 @@ async def get_ads(account_id: str, access_token: Optional[str] = None, limit: in
     # Require explicit account_id
     if not account_id:
         return json.dumps({"error": "No account ID specified"}, indent=2)
-    
+
     # Prioritize adset_id over campaign_id - use adset-specific endpoint
     if adset_id:
         endpoint = f"{adset_id}/ads"
         params = {
             "fields": "id,name,adset_id,campaign_id,status,creative,created_time,updated_time,bid_amount,conversion_domain,tracking_specs",
-            "limit": limit
+            "limit": limit,
         }
     # Use campaign-specific endpoint if campaign_id is provided
     elif campaign_id:
         endpoint = f"{campaign_id}/ads"
         params = {
             "fields": "id,name,adset_id,campaign_id,status,creative,created_time,updated_time,bid_amount,conversion_domain,tracking_specs",
-            "limit": limit
+            "limit": limit,
         }
     else:
         # Default to account-level endpoint if no specific filters
         endpoint = f"{account_id}/ads"
         params = {
             "fields": "id,name,adset_id,campaign_id,status,creative,created_time,updated_time,bid_amount,conversion_domain,tracking_specs",
-            "limit": limit
+            "limit": limit,
         }
 
     data = await make_api_request(endpoint, access_token, params)
-    
+
     return json.dumps(data, indent=2)
 
 
 @mcp_server.tool()
 @meta_api_tool
-async def get_ad_details(ad_id: str, access_token: Optional[str] = None) -> str:
+async def get_ad_details(ad_id: str, access_token: str | None = None) -> str:
     """
     Get detailed information about a specific ad.
-    
+
     Args:
         ad_id: Meta Ads ad ID
         access_token: Meta API access token (optional - will use cached token if not provided)
     """
     if not ad_id:
         return json.dumps({"error": "No ad ID provided"}, indent=2)
-        
+
     endpoint = f"{ad_id}"
     params = {
         "fields": "id,name,adset_id,campaign_id,status,creative,created_time,updated_time,bid_amount,conversion_domain,tracking_specs,preview_shareable_link"
     }
-    
+
     data = await make_api_request(endpoint, access_token, params)
-    
+
     return json.dumps(data, indent=2)
 
 
 @mcp_server.tool()
 @meta_api_tool
-async def get_creative_details(creative_id: str, access_token: Optional[str] = None) -> str:
+async def get_creative_details(creative_id: str, access_token: str | None = None) -> str:
     """Get detailed information about a specific ad creative by its ID.
 
     Args:
@@ -513,9 +509,7 @@ async def get_creative_details(creative_id: str, access_token: Optional[str] = N
     if isinstance(data, dict) and "id" in data:
         for opt_field in ["dynamic_creative_spec", "degrees_of_freedom_spec", "product_set_id"]:
             try:
-                opt_data = await make_api_request(
-                    endpoint, access_token, {"fields": opt_field}
-                )
+                opt_data = await make_api_request(endpoint, access_token, {"fields": opt_field})
                 if isinstance(opt_data, dict) and opt_field in opt_data:
                     data[opt_field] = opt_data[opt_field]
             except Exception:
@@ -525,8 +519,7 @@ async def get_creative_details(creative_id: str, access_token: Optional[str] = N
         if "product_set_id" in data:
             try:
                 catalog_data = await make_api_request(
-                    data["product_set_id"], access_token,
-                    {"fields": "product_catalog{id,name}"}
+                    data["product_set_id"], access_token, {"fields": "product_catalog{id,name}"}
                 )
                 catalog = catalog_data.get("product_catalog", {})
                 if catalog.get("id"):
@@ -547,13 +540,13 @@ async def create_ad(
     adset_id: str,
     creative_id: str,
     status: str = "PAUSED",
-    bid_amount: Optional[int] = None,
-    tracking_specs: Optional[List[Dict[str, Any]]] = None,
-    access_token: Optional[str] = None
+    bid_amount: int | None = None,
+    tracking_specs: list[dict[str, Any]] | None = None,
+    access_token: str | None = None,
 ) -> str:
     """
     Create a new ad with an existing creative.
-    
+
     Args:
         account_id: Meta Ads account ID (format: act_XXXXXXXXX)
         name: Ad name
@@ -572,73 +565,64 @@ async def create_ad(
     # Check required parameters
     if not account_id:
         return json.dumps({"error": "No account ID provided"}, indent=2)
-    
+
     if not name:
         return json.dumps({"error": "No ad name provided"}, indent=2)
-    
+
     if not adset_id:
         return json.dumps({"error": "No ad set ID provided"}, indent=2)
-    
+
     if not creative_id:
         return json.dumps({"error": "No creative ID provided"}, indent=2)
-    
+
     endpoint = f"{account_id}/ads"
-    
-    params = {
-        "name": name,
-        "adset_id": adset_id,
-        "creative": {"creative_id": creative_id},
-        "status": status
-    }
-    
+
+    params = {"name": name, "adset_id": adset_id, "creative": {"creative_id": creative_id}, "status": status}
+
     # Add bid amount if provided
     if bid_amount is not None:
         params["bid_amount"] = str(bid_amount)
-        
+
     # Add tracking specs if provided
     if tracking_specs is not None:
-        params["tracking_specs"] = json.dumps(tracking_specs) # Needs to be JSON encoded string
-    
+        params["tracking_specs"] = json.dumps(tracking_specs)  # Needs to be JSON encoded string
+
     try:
         data = await make_api_request(endpoint, access_token, params, method="POST")
         return json.dumps(data, indent=2)
     except Exception as e:
         error_msg = str(e)
-        return json.dumps({
-            "error": "Failed to create ad",
-            "details": error_msg,
-            "params_sent": params
-        }, indent=2)
+        return json.dumps({"error": "Failed to create ad", "details": error_msg, "params_sent": params}, indent=2)
 
 
 @mcp_server.tool()
 @meta_api_tool
-async def get_ad_creatives(ad_id: str, access_token: Optional[str] = None) -> str:
+async def get_ad_creatives(ad_id: str, access_token: str | None = None) -> str:
     """
     Get creative details for a specific ad. Requires an ad_id (not account_id). Use get_ads first to find ad IDs.
-    
+
     Args:
         ad_id: Meta Ads ad ID (required)
         access_token: Meta API access token (optional - will use cached token if not provided)
     """
     if not ad_id:
         return json.dumps({"error": "No ad ID provided"}, indent=2)
-        
+
     endpoint = f"{ad_id}/adcreatives"
     params = {
         "fields": "id,name,status,thumbnail_url,image_url,image_hash,object_story_spec,object_type,body,title,effective_object_story_id,asset_feed_spec,url_tags,image_urls_for_viewing,product_set_id,degrees_of_freedom_spec"
     }
-    
+
     data = await make_api_request(endpoint, access_token, params)
 
-    if 'data' in data:
+    if "data" in data:
         # Resolve asset_feed_spec image hashes to URLs
         image_hashes = set()
-        for creative in data['data']:
-            if 'asset_feed_spec' in creative and 'images' in creative['asset_feed_spec']:
-                for image in creative['asset_feed_spec']['images']:
-                    if 'hash' in image and 'url' not in image:
-                        image_hashes.add(image['hash'])
+        for creative in data["data"]:
+            if "asset_feed_spec" in creative and "images" in creative["asset_feed_spec"]:
+                for image in creative["asset_feed_spec"]["images"]:
+                    if "hash" in image and "url" not in image:
+                        image_hashes.add(image["hash"])
 
         if image_hashes:
             # Get account_id from the ad to look up image URLs
@@ -652,31 +636,28 @@ async def get_ad_creatives(ad_id: str, access_token: Optional[str] = None) -> st
                     {"fields": "hash,url,width,height", "hashes": hashes_str},
                 )
                 hash_to_url = {}
-                if 'data' in image_data:
-                    for img in image_data['data']:
-                        if 'hash' in img and 'url' in img:
-                            hash_to_url[img['hash']] = img['url']
+                if "data" in image_data:
+                    for img in image_data["data"]:
+                        if "hash" in img and "url" in img:
+                            hash_to_url[img["hash"]] = img["url"]
 
                 if hash_to_url:
-                    for creative in data['data']:
-                        if 'asset_feed_spec' in creative and 'images' in creative['asset_feed_spec']:
-                            for image in creative['asset_feed_spec']['images']:
-                                if 'hash' in image and image['hash'] in hash_to_url:
-                                    image['url'] = hash_to_url[image['hash']]
+                    for creative in data["data"]:
+                        if "asset_feed_spec" in creative and "images" in creative["asset_feed_spec"]:
+                            for image in creative["asset_feed_spec"]["images"]:
+                                if "hash" in image and image["hash"] in hash_to_url:
+                                    image["url"] = hash_to_url[image["hash"]]
 
         # Add image URLs for direct viewing if available
-        for creative in data['data']:
-            creative['image_urls_for_viewing'] = extract_creative_image_urls(creative)
+        for creative in data["data"]:
+            creative["image_urls_for_viewing"] = extract_creative_image_urls(creative)
 
         # Resolve product_set_id -> catalog info for DPA/catalog creatives
-        for creative in data['data']:
-            ps_id = creative.get('product_set_id')
+        for creative in data["data"]:
+            ps_id = creative.get("product_set_id")
             if ps_id:
                 try:
-                    catalog_data = await make_api_request(
-                        ps_id, access_token,
-                        {"fields": "product_catalog{id,name}"}
-                    )
+                    catalog_data = await make_api_request(ps_id, access_token, {"fields": "product_catalog{id,name}"})
                     catalog = catalog_data.get("product_catalog", {})
                     if catalog.get("id"):
                         creative["catalog_id"] = catalog["id"]
@@ -690,74 +671,70 @@ async def get_ad_creatives(ad_id: str, access_token: Optional[str] = None) -> st
 
 @mcp_server.tool()
 @meta_api_tool
-async def get_ad_image(ad_id: str, access_token: Optional[str] = None) -> Image:
+async def get_ad_image(ad_id: str, access_token: str | None = None) -> Image:
     """
     Get, download, and visualize a Meta ad image in one step. Useful to see the image in the LLM.
-    
+
     Args:
         ad_id: Meta Ads ad ID
         access_token: Meta API access token (optional - will use cached token if not provided)
-    
+
     Returns:
         The ad image ready for direct visual analysis
     """
     if not ad_id:
         return "Error: No ad ID provided"
-        
+
     print(f"Attempting to get and analyze creative image for ad {ad_id}")
-    
+
     # First, get creative and account IDs
     ad_endpoint = f"{ad_id}"
-    ad_params = {
-        "fields": "creative{id},account_id"
-    }
-    
+    ad_params = {"fields": "creative{id},account_id"}
+
     ad_data = await make_api_request(ad_endpoint, access_token, ad_params)
-    
+
     if "error" in ad_data:
         return f"Error: Could not get ad data - {json.dumps(ad_data)}"
-    
+
     # Extract account_id
     account_id = ad_data.get("account_id", "")
     if not account_id:
         return "Error: No account ID found"
-    
+
     # Extract creative ID
     if "creative" not in ad_data:
         return "Error: No creative found for this ad"
-        
+
     creative_data = ad_data.get("creative", {})
     creative_id = creative_data.get("id")
     if not creative_id:
         return "Error: No creative ID found"
-    
+
     # Get creative details to find image hash
     creative_endpoint = f"{creative_id}"
-    creative_params = {
-        "fields": "id,name,image_hash,asset_feed_spec"
-    }
-    
+    creative_params = {"fields": "id,name,image_hash,asset_feed_spec"}
+
     creative_details = await make_api_request(creative_endpoint, access_token, creative_params)
-    
+
     # Identify image hashes to use from creative
     image_hashes = []
-    
+
     # Check for direct image_hash on creative
     if "image_hash" in creative_details:
         image_hashes.append(creative_details["image_hash"])
-    
+
     # Check asset_feed_spec for image hashes - common in Advantage+ ads
     if "asset_feed_spec" in creative_details and "images" in creative_details["asset_feed_spec"]:
         for image in creative_details["asset_feed_spec"]["images"]:
             if "hash" in image:
                 image_hashes.append(image["hash"])
-    
+
     if not image_hashes:
         # If no hashes found, try to extract from the first creative we found in the API
         # and also check for direct URLs as fallback
         creative_json = await get_ad_creatives(access_token=access_token, ad_id=ad_id)
         creative_data = json.loads(creative_json)
-        
+
         # Try to extract hash from data array
         if "data" in creative_data and creative_data["data"]:
             for creative in creative_data["data"]:
@@ -774,21 +751,21 @@ async def get_ad_image(ad_id: str, access_token: Optional[str] = None) -> Image:
                     images = creative["asset_feed_spec"]["images"]
                     if images and len(images) > 0 and "hash" in images[0]:
                         image_hashes.append(images[0]["hash"])
-        
+
         # If still no image hashes found, try direct URL fallback approach
         if not image_hashes:
             print("No image hashes found, trying direct URL fallback...")
-            
+
             image_url = None
             if "data" in creative_data and creative_data["data"]:
                 creative = creative_data["data"][0]
-                
+
                 # Prioritize higher quality image URLs in this order:
                 # 1. image_urls_for_viewing (usually highest quality)
                 # 2. image_url (direct field)
                 # 3. object_story_spec.link_data.picture (usually full size)
                 # 4. thumbnail_url (last resort - often profile thumbnail)
-                
+
                 if "image_urls_for_viewing" in creative and creative["image_urls_for_viewing"]:
                     image_url = creative["image_urls_for_viewing"][0]
                     print(f"Using image_urls_for_viewing: {image_url}")
@@ -803,96 +780,95 @@ async def get_ad_image(ad_id: str, access_token: Optional[str] = None) -> Image:
                 elif "thumbnail_url" in creative and creative["thumbnail_url"]:
                     image_url = creative["thumbnail_url"]
                     print(f"Using thumbnail_url (fallback): {image_url}")
-            
+
             if not image_url:
                 return "Error: No image URLs found in creative"
-            
+
             # Download the image directly
             print(f"Downloading image from direct URL: {image_url}")
             image_bytes = await download_image(image_url)
-            
+
             if not image_bytes:
                 return "Error: Failed to download image from direct URL"
-            
+
             try:
                 # Convert bytes to PIL Image
                 img = PILImage.open(io.BytesIO(image_bytes))
-                
+
                 # Convert to RGB if needed
                 if img.mode != "RGB":
                     img = img.convert("RGB")
-                    
+
                 # Create a byte stream of the image data
                 byte_arr = io.BytesIO()
                 img.save(byte_arr, format="JPEG")
                 img_bytes = byte_arr.getvalue()
-                
+
                 # Return as an Image object that LLM can directly analyze
                 return Image(data=img_bytes, format="jpeg")
-                
+
             except Exception as e:
                 return f"Error processing image from direct URL: {str(e)}"
-    
+
     print(f"Found image hashes: {image_hashes}")
-    
+
     # Now fetch image data using adimages endpoint with specific format
     image_endpoint = f"act_{account_id}/adimages"
-    
+
     # Format the hashes parameter exactly as in our successful curl test
     hashes_str = f'["{image_hashes[0]}"]'  # Format first hash only, as JSON string array
-    
-    image_params = {
-        "fields": "hash,url,width,height,name,status",
-        "hashes": hashes_str
-    }
-    
+
+    image_params = {"fields": "hash,url,width,height,name,status", "hashes": hashes_str}
+
     print(f"Requesting image data with params: {image_params}")
     image_data = await make_api_request(image_endpoint, access_token, image_params)
-    
+
     if "error" in image_data:
         return f"Error: Failed to get image data - {json.dumps(image_data)}"
-    
+
     if "data" not in image_data or not image_data["data"]:
         return "Error: No image data returned from API"
-    
+
     # Get the first image URL
     first_image = image_data["data"][0]
     image_url = first_image.get("url")
-    
+
     if not image_url:
         return "Error: No valid image URL found"
-    
+
     print(f"Downloading image from URL: {image_url}")
-    
+
     # Download the image
     image_bytes = await download_image(image_url)
-    
+
     if not image_bytes:
         return "Error: Failed to download image"
-    
+
     try:
         # Convert bytes to PIL Image
         img = PILImage.open(io.BytesIO(image_bytes))
-        
+
         # Convert to RGB if needed
         if img.mode != "RGB":
             img = img.convert("RGB")
-            
+
         # Create a byte stream of the image data
         byte_arr = io.BytesIO()
         img.save(byte_arr, format="JPEG")
         img_bytes = byte_arr.getvalue()
-        
+
         # Return as an Image object that LLM can directly analyze
         return Image(data=img_bytes, format="jpeg")
-        
+
     except Exception as e:
         return f"Error processing image: {str(e)}"
 
 
 @mcp_server.tool()
 @meta_api_tool
-async def get_ad_video(ad_id: str = "", video_id: str = "", account_id: str = "", access_token: Optional[str] = None) -> str:
+async def get_ad_video(
+    ad_id: str = "", video_id: str = "", account_id: str = "", access_token: str | None = None
+) -> str:
     """
     Get video details and source URL for a Meta ad video creative. Returns the video source URL
     (direct download link), thumbnail URL, and metadata (title, description, duration).
@@ -935,10 +911,13 @@ async def get_ad_video(ad_id: str = "", video_id: str = "", account_id: str = ""
                     video_id = str(videos[0].get("video_id", ""))
 
         if not video_id:
-            return json.dumps({
-                "error": "No video found in this ad creative",
-                "hint": "This ad may be an image ad. Use get_ad_image instead."
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": "No video found in this ad creative",
+                    "hint": "This ad may be an image ad. Use get_ad_image instead.",
+                },
+                indent=2,
+            )
 
     video_fields = "source,title,description,length,picture,thumbnails,created_time"
 
@@ -970,11 +949,7 @@ async def get_ad_video(ad_id: str = "", video_id: str = "", account_id: str = ""
 
     # Strategy 2: Fall back to direct video node access.
     if not video_data:
-        video_data = await make_api_request(
-            video_id,
-            access_token,
-            {"fields": video_fields}
-        )
+        video_data = await make_api_request(video_id, access_token, {"fields": video_fields})
 
     if "error" in video_data:
         return json.dumps({"error": f"Could not get video {video_id}", "details": video_data}, indent=2)
@@ -999,55 +974,52 @@ async def get_ad_video(ad_id: str = "", video_id: str = "", account_id: str = ""
 
 
 if ENABLE_SAVE_AD_IMAGE_LOCALLY:
+
     @mcp_server.tool()
     @meta_api_tool
-    async def save_ad_image_locally(ad_id: str, access_token: Optional[str] = None, output_dir: str = "ad_images") -> str:
+    async def save_ad_image_locally(ad_id: str, access_token: str | None = None, output_dir: str = "ad_images") -> str:
         """
         Get, download, and save a Meta ad image locally, returning the file path.
-        
+
         Args:
             ad_id: Meta Ads ad ID
             access_token: Meta API access token (optional - will use cached token if not provided)
             output_dir: Directory to save the image file (default: 'ad_images')
-        
+
         Returns:
             The file path to the saved image, or an error message string.
         """
         if not ad_id:
             return json.dumps({"error": "No ad ID provided"}, indent=2)
-            
+
         print(f"Attempting to get and save creative image for ad {ad_id}")
-        
+
         # First, get creative and account IDs
         ad_endpoint = f"{ad_id}"
-        ad_params = {
-            "fields": "creative{id},account_id"
-        }
-        
+        ad_params = {"fields": "creative{id},account_id"}
+
         ad_data = await make_api_request(ad_endpoint, access_token, ad_params)
-        
+
         if "error" in ad_data:
             return json.dumps({"error": f"Could not get ad data - {json.dumps(ad_data)}"}, indent=2)
-        
+
         account_id = ad_data.get("account_id")
         if not account_id:
             return json.dumps({"error": "No account ID found for ad"}, indent=2)
-        
+
         if "creative" not in ad_data:
             return json.dumps({"error": "No creative found for this ad"}, indent=2)
-            
+
         creative_data = ad_data.get("creative", {})
         creative_id = creative_data.get("id")
         if not creative_id:
             return json.dumps({"error": "No creative ID found"}, indent=2)
-        
+
         # Get creative details to find image hash
         creative_endpoint = f"{creative_id}"
-        creative_params = {
-            "fields": "id,name,image_hash,asset_feed_spec"
-        }
+        creative_params = {"fields": "id,name,image_hash,asset_feed_spec"}
         creative_details = await make_api_request(creative_endpoint, access_token, creative_params)
-        
+
         image_hashes = []
         if "image_hash" in creative_details:
             image_hashes.append(creative_details["image_hash"])
@@ -1055,71 +1027,73 @@ if ENABLE_SAVE_AD_IMAGE_LOCALLY:
             for image in creative_details["asset_feed_spec"]["images"]:
                 if "hash" in image:
                     image_hashes.append(image["hash"])
-        
+
         if not image_hashes:
             # Fallback attempt (as in get_ad_image)
-            creative_json = await get_ad_creatives(ad_id=ad_id, access_token=access_token) # Ensure ad_id is passed correctly
+            creative_json = await get_ad_creatives(
+                ad_id=ad_id, access_token=access_token
+            )  # Ensure ad_id is passed correctly
             creative_data_list = json.loads(creative_json)
-            if 'data' in creative_data_list and creative_data_list['data']:
-                 first_creative = creative_data_list['data'][0]
-                 if 'object_story_spec' in first_creative and 'link_data' in first_creative['object_story_spec'] and 'image_hash' in first_creative['object_story_spec']['link_data']:
-                     image_hashes.append(first_creative['object_story_spec']['link_data']['image_hash'])
-                 elif 'image_hash' in first_creative: # Check direct hash on creative data
-                      image_hashes.append(first_creative['image_hash'])
-
+            if "data" in creative_data_list and creative_data_list["data"]:
+                first_creative = creative_data_list["data"][0]
+                if (
+                    "object_story_spec" in first_creative
+                    and "link_data" in first_creative["object_story_spec"]
+                    and "image_hash" in first_creative["object_story_spec"]["link_data"]
+                ):
+                    image_hashes.append(first_creative["object_story_spec"]["link_data"]["image_hash"])
+                elif "image_hash" in first_creative:  # Check direct hash on creative data
+                    image_hashes.append(first_creative["image_hash"])
 
         if not image_hashes:
             return json.dumps({"error": "No image hashes found in creative or fallback"}, indent=2)
 
         print(f"Found image hashes: {image_hashes}")
-        
+
         # Fetch image data using the first hash
         image_endpoint = f"act_{account_id}/adimages"
         hashes_str = f'["{image_hashes[0]}"]'
-        image_params = {
-            "fields": "hash,url,width,height,name,status",
-            "hashes": hashes_str
-        }
-        
+        image_params = {"fields": "hash,url,width,height,name,status", "hashes": hashes_str}
+
         print(f"Requesting image data with params: {image_params}")
         image_data = await make_api_request(image_endpoint, access_token, image_params)
-        
+
         if "error" in image_data:
             return json.dumps({"error": f"Failed to get image data - {json.dumps(image_data)}"}, indent=2)
-        
+
         if "data" not in image_data or not image_data["data"]:
             return json.dumps({"error": "No image data returned from API"}, indent=2)
-            
+
         first_image = image_data["data"][0]
         image_url = first_image.get("url")
-        
+
         if not image_url:
             return json.dumps({"error": "No valid image URL found in API response"}, indent=2)
-            
+
         print(f"Downloading image from URL: {image_url}")
-        
+
         # Download and Save Image
         image_bytes = await download_image(image_url)
-        
+
         if not image_bytes:
             return json.dumps({"error": "Failed to download image"}, indent=2)
-            
+
         try:
             # Ensure output directory exists
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
-                
+
             # Create a filename (e.g., using ad_id and image hash)
-            file_extension = ".jpg" # Default extension, could try to infer from headers later
+            file_extension = ".jpg"  # Default extension, could try to infer from headers later
             filename = f"{ad_id}_{image_hashes[0]}{file_extension}"
             filepath = os.path.join(output_dir, filename)
-            
+
             # Save the image bytes to the file
             with open(filepath, "wb") as f:
                 f.write(image_bytes)
-                
+
             print(f"Image saved successfully to: {filepath}")
-            return json.dumps({"filepath": filepath}, indent=2) # Return JSON with filepath
+            return json.dumps({"filepath": filepath}, indent=2)  # Return JSON with filepath
 
         except Exception as e:
             return json.dumps({"error": f"Failed to save image: {str(e)}"}, indent=2)
@@ -1129,12 +1103,12 @@ if ENABLE_SAVE_AD_IMAGE_LOCALLY:
 @meta_api_tool
 async def update_ad(
     ad_id: str,
-    name: Optional[str] = None,
-    status: Optional[str] = None,
-    bid_amount: Optional[int] = None,
-    tracking_specs: Optional[List[Dict[str, Any]]] = None,
-    creative_id: Optional[Union[str, int]] = None,
-    access_token: Optional[str] = None
+    name: str | None = None,
+    status: str | None = None,
+    bid_amount: int | None = None,
+    tracking_specs: list[dict[str, Any]] | None = None,
+    creative_id: str | int | None = None,
+    access_token: str | None = None,
 ) -> str:
     """
     Update an ad with new settings.
@@ -1163,18 +1137,21 @@ async def update_ad(
     if bid_amount is not None:
         # Ensure bid_amount is sent as a string if it's not null
         params["bid_amount"] = str(bid_amount)
-    if tracking_specs is not None: # Add tracking_specs to params if provided
-        params["tracking_specs"] = json.dumps(tracking_specs) # Needs to be JSON encoded string
+    if tracking_specs is not None:  # Add tracking_specs to params if provided
+        params["tracking_specs"] = json.dumps(tracking_specs)  # Needs to be JSON encoded string
     if creative_id is not None:
         # Creative parameter needs to be a JSON object containing creative_id
         params["creative"] = json.dumps({"creative_id": creative_id})
 
     if not params:
-        return json.dumps({"error": "No update parameters provided (name, status, bid_amount, tracking_specs, or creative_id)"}, indent=2)
+        return json.dumps(
+            {"error": "No update parameters provided (name, status, bid_amount, tracking_specs, or creative_id)"},
+            indent=2,
+        )
 
     endpoint = f"{ad_id}"
     try:
-        data = await make_api_request(endpoint, access_token, params, method='POST')
+        data = await make_api_request(endpoint, access_token, params, method="POST")
 
         # Check for FLEX creative image mismatch error (3858355)
         if creative_id is not None and "error" in data:
@@ -1190,24 +1167,27 @@ async def update_ad(
                 error_subcode = None
 
             if error_subcode == 3858355:
-                return json.dumps({
-                    "error": "Cannot swap creative on this ad due to FLEX image mismatch",
-                    "error_subcode": 3858355,
-                    "explanation": (
-                        "Meta requires the first image in the new creative's asset_feed_spec "
-                        "to match the image in its object_story_spec. When swapping a FLEX "
-                        "creative on an existing ad, this validation can fail if the new "
-                        "creative has different images than the original."
-                    ),
-                    "workaround": (
-                        "Create a new ad with the new creative instead of swapping: "
-                        "(1) call create_ad with the new creative_id and the same adset_id, "
-                        "(2) pause the old ad with update_ad(ad_id, status='PAUSED'). "
-                        "Note: this will lose social proof (likes, comments, shares) from the original ad."
-                    ),
-                    "ad_id": ad_id,
-                    "creative_id": creative_id
-                }, indent=2)
+                return json.dumps(
+                    {
+                        "error": "Cannot swap creative on this ad due to FLEX image mismatch",
+                        "error_subcode": 3858355,
+                        "explanation": (
+                            "Meta requires the first image in the new creative's asset_feed_spec "
+                            "to match the image in its object_story_spec. When swapping a FLEX "
+                            "creative on an existing ad, this validation can fail if the new "
+                            "creative has different images than the original."
+                        ),
+                        "workaround": (
+                            "Create a new ad with the new creative instead of swapping: "
+                            "(1) call create_ad with the new creative_id and the same adset_id, "
+                            "(2) pause the old ad with update_ad(ad_id, status='PAUSED'). "
+                            "Note: this will lose social proof (likes, comments, shares) from the original ad."
+                        ),
+                        "ad_id": ad_id,
+                        "creative_id": creative_id,
+                    },
+                    indent=2,
+                )
 
         return json.dumps(data, indent=2)
     except Exception as e:
@@ -1218,32 +1198,32 @@ async def update_ad(
 @meta_api_tool
 async def upload_ad_image(
     account_id: str,
-    access_token: Optional[str] = None,
-    file: Optional[str] = None,
-    image_url: Optional[str] = None,
-    name: Optional[str] = None
+    access_token: str | None = None,
+    file: str | None = None,
+    image_url: str | None = None,
+    name: str | None = None,
 ) -> str:
     """
     Upload an image to use in Meta Ads creatives.
-    
+
     Args:
         account_id: Meta Ads account ID (format: act_XXXXXXXXX)
         access_token: Meta API access token (optional - will use cached token if not provided)
         file: Data URL or raw base64 string of the image (e.g., "data:image/png;base64,iVBORw0KG...")
         image_url: Direct URL to an image to fetch and upload
         name: Optional name for the image (default: filename)
-    
+
     Returns:
         JSON response with image details including hash for creative creation
     """
     # Check required parameters
     if not account_id:
         return json.dumps({"error": "No account ID provided"}, indent=2)
-    
+
     # Ensure we have image data
     if not file and not image_url:
         return json.dumps({"error": "Provide either 'file' (data URL or base64) or 'image_url'"}, indent=2)
-    
+
     account_id = ensure_act_prefix(account_id)
 
     try:
@@ -1262,7 +1242,7 @@ async def upload_ad_image(
                 # Infer file extension from MIME type if name not provided
                 if not inferred_name:
                     # Example header: data:image/png;...
-                    mime_type = header[len(data_url_prefix):].split(";")[0].strip()
+                    mime_type = header[len(data_url_prefix) :].split(";")[0].strip()
                     extension_map = {
                         "image/png": ".png",
                         "image/jpeg": ".jpg",
@@ -1284,33 +1264,40 @@ async def upload_ad_image(
             try:
                 image_bytes = await try_multiple_download_methods(image_url)
             except Exception as download_error:
-                return json.dumps({
-                    "error": "We couldn’t download the image from the link provided.",
-                    "reason": "The server returned an error while trying to fetch the image.",
-                    "image_url": image_url,
-                    "details": str(download_error),
-                    "suggestions": [
-                        "Easiest fix: upload your image at https://pipeboard.co/creatives, then copy the image hash and use it directly instead of a URL.",
-                        "Make sure the link is publicly reachable (no login, VPN, or IP restrictions). Local file paths (file://...) cannot be accessed by the server.",
-                        "If the image is hosted on a private app or server, move it to a public URL or a CDN and try again.",
-                        "Verify the URL is correct and serves the actual image file."
-                    ]
-                }, indent=2)
+                return json.dumps(
+                    {
+                        "error": "We couldn’t download the image from the link provided.",
+                        "reason": "The server returned an error while trying to fetch the image.",
+                        "image_url": image_url,
+                        "details": str(download_error),
+                        "suggestions": [
+                            "Easiest fix: upload the image to your Meta Ads account first (e.g. via upload_ad_image or Meta Ads Manager), then pass the returned image hash instead of a URL.",
+                            "Make sure the link is publicly reachable (no login, VPN, or IP restrictions). Local file paths (file://...) cannot be accessed by the server.",
+                            "If the image is hosted on a private app or server, move it to a public URL or a CDN and try again.",
+                            "Verify the URL is correct and serves the actual image file.",
+                        ],
+                    },
+                    indent=2,
+                )
 
             if not image_bytes:
-                return json.dumps({
-                    "error": "We couldn’t access the image at the link you provided.",
-                    "reason": "The image link doesn’t appear to be publicly accessible or didn’t return any data.",
-                    "image_url": image_url,
-                    "suggestions": [
-                        "Easiest fix: upload your image at https://pipeboard.co/creatives, then copy the image hash and use it directly instead of a URL.",
-                        "Double-check that the link is public and does not require login, VPN, or IP allow-listing. Local file paths (file://...) cannot be accessed by the server.",
-                        "If the image is stored in a private app (for example, a self-hosted gallery), upload it to a public URL or a CDN and try again.",
-                        "Confirm the URL is correct and points directly to an image file (e.g., .jpg, .png)."
-                    ]
-                }, indent=2)
+                return json.dumps(
+                    {
+                        "error": "We couldn’t access the image at the link you provided.",
+                        "reason": "The image link doesn’t appear to be publicly accessible or didn’t return any data.",
+                        "image_url": image_url,
+                        "suggestions": [
+                            "Easiest fix: upload the image to your Meta Ads account first (e.g. via upload_ad_image or Meta Ads Manager), then pass the returned image hash instead of a URL.",
+                            "Double-check that the link is public and does not require login, VPN, or IP allow-listing. Local file paths (file://...) cannot be accessed by the server.",
+                            "If the image is stored in a private app (for example, a self-hosted gallery), upload it to a public URL or a CDN and try again.",
+                            "Confirm the URL is correct and points directly to an image file (e.g., .jpg, .png).",
+                        ],
+                    },
+                    indent=2,
+                )
 
             import base64  # Local import
+
             encoded_image = base64.b64encode(image_bytes).decode("utf-8")
 
             # Infer name from URL if not provided
@@ -1367,49 +1354,44 @@ async def upload_ad_image(
                 "name": final_name,
                 "image_hash": primary_hash,
                 "images_count": len(images_list),
-                "images": images_list
+                "images": images_list,
             }
             return json.dumps(result, indent=2)
 
         # If the API returned an error-like structure, surface it consistently
         if isinstance(data, dict) and "error" in data:
-            return json.dumps({
-                "error": "Failed to upload image",
-                "details": data.get("error"),
-                "account_id": account_id,
-                "name": final_name
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": "Failed to upload image",
+                    "details": data.get("error"),
+                    "account_id": account_id,
+                    "name": final_name,
+                },
+                indent=2,
+            )
 
         # Fallback: return a wrapped raw response to avoid breaking callers
-        return json.dumps({
-            "success": True,
-            "account_id": account_id,
-            "name": final_name,
-            "raw_response": data
-        }, indent=2)
+        return json.dumps(
+            {"success": True, "account_id": account_id, "name": final_name, "raw_response": data}, indent=2
+        )
 
     except Exception as e:
-        return json.dumps({
-            "error": "Failed to upload image",
-            "details": str(e)
-        }, indent=2)
+        return json.dumps({"error": "Failed to upload image", "details": str(e)}, indent=2)
 
 
 # Valid image_crops keys accepted by Meta's API and their aspect ratios (width/height).
 _VALID_CROP_KEYS: list[tuple[str, int, int]] = [
-    ("100x100", 100, 100),   # 1:1 square — Feed, Marketplace, Search
-    ("100x72",  100,  72),   # ~1.39:1 horizontal — Marketplace, some placements
-    ("400x500", 400, 500),   # 4:5 portrait — Feed on mobile, Stories fallback
-    ("400x150", 400, 150),   # ~2.67:1 wide banner — Audience Network
-    ("600x360", 600, 360),   # ~1.67:1 horizontal — Right column, some placements
-    ("90x160",   90, 160),   # 9:16 tall portrait — Stories
+    ("100x100", 100, 100),  # 1:1 square — Feed, Marketplace, Search
+    ("100x72", 100, 72),  # ~1.39:1 horizontal — Marketplace, some placements
+    ("400x500", 400, 500),  # 4:5 portrait — Feed on mobile, Stories fallback
+    ("400x150", 400, 150),  # ~2.67:1 wide banner — Audience Network
+    ("600x360", 600, 360),  # ~1.67:1 horizontal — Right column, some placements
+    ("90x160", 90, 160),  # 9:16 tall portrait — Stories
 ]
 _VALID_CROP_KEY_NAMES = [k for k, _, _ in _VALID_CROP_KEYS]
 
 
-def _compute_crop_box(
-    src_w: int, src_h: int, kw: int, kh: int
-) -> list[list[int]]:
+def _compute_crop_box(src_w: int, src_h: int, kw: int, kh: int) -> list[list[int]]:
     """
     Compute the largest centered crop box that fits within src_w×src_h
     while matching the aspect ratio kw:kh.
@@ -1436,7 +1418,7 @@ def _compute_crop_box(
 async def compute_image_crops(
     image_width: int,
     image_height: int,
-    crop_keys: Optional[List[str]] = None,
+    crop_keys: list[str] | None = None,
 ) -> str:
     """
     Compute image_crops coordinates for a source image of the given dimensions.
@@ -1464,9 +1446,7 @@ async def compute_image_crops(
         plus validation notes for any invalid keys requested.
     """
     if image_width <= 0 or image_height <= 0:
-        return json.dumps({
-            "error": "image_width and image_height must be positive integers."
-        }, indent=2)
+        return json.dumps({"error": "image_width and image_height must be positive integers."}, indent=2)
 
     # Resolve which keys to compute.
     if crop_keys:
@@ -1503,7 +1483,7 @@ async def compute_image_crops(
     return json.dumps(result, indent=2)
 
 
-async def _fetch_video_thumbnail(vid_id: str, access_token: str) -> Optional[str]:
+async def _fetch_video_thumbnail(vid_id: str, access_token: str) -> str | None:
     """Fetch a thumbnail URL for a Meta video. Returns None on any failure.
 
     Prefers the pre-generated `thumbnails.data[0].uri` over `picture` because
@@ -1526,40 +1506,40 @@ async def _fetch_video_thumbnail(vid_id: str, access_token: str) -> Optional[str
 @meta_api_tool
 async def create_ad_creative(
     account_id: str,
-    image_hash: Optional[str] = None,
-    access_token: Optional[str] = None,
-    name: Optional[str] = None,
-    page_id: Optional[Union[str, int]] = None,
-    link_url: Optional[str] = None,
-    message: Optional[str] = None,
-    messages: Optional[List[str]] = None,
-    headline: Optional[str] = None,
-    headlines: Optional[List[str]] = None,
-    description: Optional[str] = None,
-    descriptions: Optional[List[str]] = None,
-    image_hashes: Optional[List[str]] = None,
-    video_id: Optional[Union[str, int]] = None,
-    thumbnail_url: Optional[str] = None,
-    optimization_type: Optional[str] = None,
-    dynamic_creative_spec: Optional[Dict[str, Any]] = None,
-    call_to_action_type: Optional[str] = None,
-    lead_gen_form_id: Optional[Union[str, int]] = None,
-    instagram_actor_id: Optional[str] = None,
-    ad_formats: Optional[List[str]] = None,
-    asset_customization_rules: Optional[List[Dict[str, Any]]] = None,
-    creative_features_spec: Optional[Dict[str, Any]] = None,
-    phone_number: Optional[str] = None,
-    url_tags: Optional[str] = None,
-    caption: Optional[str] = None,
-    image_crops: Optional[Dict[str, Any]] = None,
-    object_story_id: Optional[str] = None,
-    disable_all_enhancements: Optional[bool] = None,
-    event_id: Optional[Union[str, int]] = None,
-    reminder_data: Optional[Dict[str, Any]] = None,
-    videos: Optional[List[Dict[str, Any]]] = None,
-    images: Optional[List[Dict[str, Any]]] = None,
-    facebook_branded_content: Optional[Dict[str, Any]] = None,
-    instagram_branded_content: Optional[Dict[str, Any]] = None,
+    image_hash: str | None = None,
+    access_token: str | None = None,
+    name: str | None = None,
+    page_id: str | int | None = None,
+    link_url: str | None = None,
+    message: str | None = None,
+    messages: list[str] | None = None,
+    headline: str | None = None,
+    headlines: list[str] | None = None,
+    description: str | None = None,
+    descriptions: list[str] | None = None,
+    image_hashes: list[str] | None = None,
+    video_id: str | int | None = None,
+    thumbnail_url: str | None = None,
+    optimization_type: str | None = None,
+    dynamic_creative_spec: dict[str, Any] | None = None,
+    call_to_action_type: str | None = None,
+    lead_gen_form_id: str | int | None = None,
+    instagram_actor_id: str | None = None,
+    ad_formats: list[str] | None = None,
+    asset_customization_rules: list[dict[str, Any]] | None = None,
+    creative_features_spec: dict[str, Any] | None = None,
+    phone_number: str | None = None,
+    url_tags: str | None = None,
+    caption: str | None = None,
+    image_crops: dict[str, Any] | None = None,
+    object_story_id: str | None = None,
+    disable_all_enhancements: bool | None = None,
+    event_id: str | int | None = None,
+    reminder_data: dict[str, Any] | None = None,
+    videos: list[dict[str, Any]] | None = None,
+    images: list[dict[str, Any]] | None = None,
+    facebook_branded_content: dict[str, Any] | None = None,
+    instagram_branded_content: dict[str, Any] | None = None,
 ) -> str:
     """
     Create a new ad creative using an uploaded image hash, video ID, or an existing post.
@@ -1838,25 +1818,25 @@ async def create_ad_creative(
             pass
 
     for _param_name, _param_val in [
-        ('image_hashes', image_hashes),
-        ('messages', messages),
-        ('headlines', headlines),
-        ('descriptions', descriptions),
-        ('ad_formats', ad_formats),
+        ("image_hashes", image_hashes),
+        ("messages", messages),
+        ("headlines", headlines),
+        ("descriptions", descriptions),
+        ("ad_formats", ad_formats),
     ]:
         if isinstance(_param_val, str):
             try:
                 _parsed = json.loads(_param_val)
                 if isinstance(_parsed, list):
-                    if _param_name == 'image_hashes':
+                    if _param_name == "image_hashes":
                         image_hashes = _parsed
-                    elif _param_name == 'messages':
+                    elif _param_name == "messages":
                         messages = _parsed
-                    elif _param_name == 'headlines':
+                    elif _param_name == "headlines":
                         headlines = _parsed
-                    elif _param_name == 'descriptions':
+                    elif _param_name == "descriptions":
                         descriptions = _parsed
-                    elif _param_name == 'ad_formats':
+                    elif _param_name == "ad_formats":
                         ad_formats = _parsed
             except (json.JSONDecodeError, TypeError):
                 pass
@@ -1865,7 +1845,8 @@ async def create_ad_creative(
         "create_ad_creative called: image_hash=%s, image_hashes=%s(%s), video_id=%s, "
         "messages=%s, headlines=%s, descriptions=%s, optimization_type=%s",
         type(image_hash).__name__,
-        type(image_hashes).__name__, image_hashes,
+        type(image_hashes).__name__,
+        image_hashes,
         video_id,
         type(messages).__name__,
         type(headlines).__name__,
@@ -1877,35 +1858,63 @@ async def create_ad_creative(
     # (object_story_id is an alternative media source — it references an existing post)
     media_params = sum(1 for x in [image_hash, image_hashes, video_id, videos, images] if x)
     if media_params > 1:
-        return json.dumps({"error": "Only one media source allowed. Use 'image_hash' for a single image, 'image_hashes' for multiple images, 'video_id' for a single video, 'videos' for multiple videos with placement labels, or 'images' for multiple images with placement labels."}, indent=2)
+        return json.dumps(
+            {
+                "error": "Only one media source allowed. Use 'image_hash' for a single image, 'image_hashes' for multiple images, 'video_id' for a single video, 'videos' for multiple videos with placement labels, or 'images' for multiple images with placement labels."
+            },
+            indent=2,
+        )
 
     if media_params == 0 and not object_story_id:
-        return json.dumps({"error": "No media provided. Specify 'image_hash', 'image_hashes', 'video_id', 'videos', 'images', or 'object_story_id'."}, indent=2)
+        return json.dumps(
+            {
+                "error": "No media provided. Specify 'image_hash', 'image_hashes', 'video_id', 'videos', 'images', or 'object_story_id'."
+            },
+            indent=2,
+        )
 
     # Validate image_hashes limits
-    if image_hashes:
-        if len(image_hashes) > 10:
-            return json.dumps({"error": "Maximum 10 image hashes allowed for FLEX creatives"}, indent=2)
+    if image_hashes and len(image_hashes) > 10:
+        return json.dumps({"error": "Maximum 10 image hashes allowed for FLEX creatives"}, indent=2)
 
     # Validate thumbnail_url only with video_id (videos[] entries carry their own thumbnail_url)
     if thumbnail_url and not video_id:
-        return json.dumps({"error": "thumbnail_url can only be used with video_id. For videos[], include thumbnail_url in each video entry."}, indent=2)
+        return json.dumps(
+            {
+                "error": "thumbnail_url can only be used with video_id. For videos[], include thumbnail_url in each video entry."
+            },
+            indent=2,
+        )
 
     # Note: DOF + multiple image_hashes — Meta accepts the spec but serves only ONE image at
     # delivery time. The call proceeds; a warning is included in the response.
     dof_multi_image_warning = (
-        f"DEGREES_OF_FREEDOM mode with {len(image_hashes)} image_hashes: Meta will only serve "
-        "ONE image at delivery time. Multiple image_hashes are accepted by the API but silently "
-        "collapsed at serving. To use multiple images, remove optimization_type and enable "
-        "is_dynamic_creative on the ad set instead."
-    ) if (optimization_type == "DEGREES_OF_FREEDOM" and image_hashes and len(image_hashes) > 1) else None
+        (
+            f"DEGREES_OF_FREEDOM mode with {len(image_hashes)} image_hashes: Meta will only serve "
+            "ONE image at delivery time. Multiple image_hashes are accepted by the API but silently "
+            "collapsed at serving. To use multiple images, remove optimization_type and enable "
+            "is_dynamic_creative on the ad set instead."
+        )
+        if (optimization_type == "DEGREES_OF_FREEDOM" and image_hashes and len(image_hashes) > 1)
+        else None
+    )
 
     # Validate message / messages mutual exclusivity
     if message and messages:
-        return json.dumps({"error": "Cannot specify both 'message' and 'messages'. Use 'message' for single text or 'messages' for multiple variants."}, indent=2)
-    
+        return json.dumps(
+            {
+                "error": "Cannot specify both 'message' and 'messages'. Use 'message' for single text or 'messages' for multiple variants."
+            },
+            indent=2,
+        )
+
     if not link_url and not lead_gen_form_id and not object_story_id and not reminder_data:
-        return json.dumps({"error": "No link_url provided. A destination URL is required for ad creatives (unless using lead_gen_form_id, object_story_id, or reminder_data)."}, indent=2)
+        return json.dumps(
+            {
+                "error": "No link_url provided. A destination URL is required for ad creatives (unless using lead_gen_form_id, object_story_id, or reminder_data)."
+            },
+            indent=2,
+        )
 
     if not name:
         name = f"Creative {int(time.time())}"
@@ -1924,21 +1933,27 @@ async def create_ad_creative(
                 page_name = page_discovery_result.get("page_name", "Unknown")
                 print(f"Auto-discovered page ID: {page_id} ({page_name})")
             else:
-                return json.dumps({
-                    "error": "No page ID provided and no suitable pages found for this account",
-                    "details": page_discovery_result.get("message", "Page discovery failed"),
-                    "suggestions": [
-                        "Use get_account_pages to see available pages",
-                        "Use search_pages_by_name to find specific pages",
-                        "Provide a page_id parameter manually"
-                    ]
-                }, indent=2)
+                return json.dumps(
+                    {
+                        "error": "No page ID provided and no suitable pages found for this account",
+                        "details": page_discovery_result.get("message", "Page discovery failed"),
+                        "suggestions": [
+                            "Use get_account_pages to see available pages",
+                            "Use search_pages_by_name to find specific pages",
+                            "Provide a page_id parameter manually",
+                        ],
+                    },
+                    indent=2,
+                )
         except Exception as e:
-            return json.dumps({
-                "error": "Error during page discovery",
-                "details": str(e),
-                "suggestion": "Please provide a page_id parameter or use get_account_pages to find available pages"
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": "Error during page discovery",
+                    "details": str(e),
+                    "suggestion": "Please provide a page_id parameter or use get_account_pages to find available pages",
+                },
+                indent=2,
+            )
 
     # Normalize page_id to string after all assignment paths (input param + discovery).
     # Skip when object_story_id is used — page_id may be None in that path.
@@ -1947,34 +1962,42 @@ async def create_ad_creative(
 
     # Validate headline/description parameters - cannot mix simple and complex
     if headline and headlines:
-        return json.dumps({"error": "Cannot specify both 'headline' and 'headlines'. Use 'headline' for single headline or 'headlines' for multiple."}, indent=2)
-    
+        return json.dumps(
+            {
+                "error": "Cannot specify both 'headline' and 'headlines'. Use 'headline' for single headline or 'headlines' for multiple."
+            },
+            indent=2,
+        )
+
     if description and descriptions:
-        return json.dumps({"error": "Cannot specify both 'description' and 'descriptions'. Use 'description' for single description or 'descriptions' for multiple."}, indent=2)
-    
+        return json.dumps(
+            {
+                "error": "Cannot specify both 'description' and 'descriptions'. Use 'description' for single description or 'descriptions' for multiple."
+            },
+            indent=2,
+        )
+
     # Validate dynamic creative parameters (plural forms only)
     if headlines:
         if len(headlines) > 5:
             return json.dumps({"error": "Maximum 5 headlines allowed for dynamic creatives"}, indent=2)
         for i, h in enumerate(headlines):
             if len(h) > 40:
-                return json.dumps({"error": f"Headline {i+1} exceeds 40 character limit"}, indent=2)
+                return json.dumps({"error": f"Headline {i + 1} exceeds 40 character limit"}, indent=2)
 
     if descriptions:
         if len(descriptions) > 5:
             return json.dumps({"error": "Maximum 5 descriptions allowed for dynamic creatives"}, indent=2)
         for i, d in enumerate(descriptions):
             if len(d) > 125:
-                return json.dumps({"error": f"Description {i+1} exceeds 125 character limit"}, indent=2)
+                return json.dumps({"error": f"Description {i + 1} exceeds 125 character limit"}, indent=2)
 
     # Prepare the API endpoint for creating a creative
     endpoint = f"{account_id}/adcreatives"
 
     try:
         # Prepare the creative data
-        creative_data = {
-            "name": name
-        }
+        creative_data = {"name": name}
 
         # Auto-downgrade DOF when asset_customization_rules is provided.
         # Meta silently ignores asset_customization_rules for DEGREES_OF_FREEDOM
@@ -2003,8 +2026,15 @@ async def create_ad_creative(
         #   ("object_story_spec ill formed") occurs when asset_feed_spec is absent. Routing
         #   through asset_feed_spec ensures ad_formats is automatically included.
         use_asset_feed = bool(
-            headlines or descriptions or messages or image_hashes or videos or images
-            or optimization_type or asset_customization_rules or (video_id and description)
+            headlines
+            or descriptions
+            or messages
+            or image_hashes
+            or videos
+            or images
+            or optimization_type
+            or asset_customization_rules
+            or (video_id and description)
             or (video_id and instagram_actor_id)
         )
 
@@ -2037,7 +2067,7 @@ async def create_ad_creative(
                 translated_rules_osi, videos_array_osi = _translate_video_customization_rules_for_existing_post(
                     asset_customization_rules
                 )
-                asset_feed_spec_osi: Dict[str, Any] = {}
+                asset_feed_spec_osi: dict[str, Any] = {}
                 if videos_array_osi:
                     asset_feed_spec_osi["videos"] = videos_array_osi
                 if translated_rules_osi:
@@ -2050,8 +2080,8 @@ async def create_ad_creative(
                     creative_data["asset_feed_spec"] = asset_feed_spec_osi
             elif call_to_action_type:
                 # No asset_feed_spec: put CTA at top level for simple existing-post creatives
-                cta_osi: Dict[str, Any] = {"type": call_to_action_type}
-                cta_osi_value: Dict[str, Any] = {}
+                cta_osi: dict[str, Any] = {"type": call_to_action_type}
+                cta_osi_value: dict[str, Any] = {}
                 if link_url:
                     cta_osi_value["link"] = link_url
                 if lead_gen_form_id:
@@ -2079,29 +2109,26 @@ async def create_ad_creative(
                 # avoid N sequential round trips for N videos.
                 thumb_coros = [
                     _fetch_video_thumbnail(str(v["video_id"]), access_token)
-                    for v in videos if not v.get("thumbnail_url")
+                    for v in videos
+                    if not v.get("thumbnail_url")
                 ]
                 fetched_iter = iter(await asyncio.gather(*thumb_coros) if thumb_coros else [])
                 videos_array = []
                 for v in videos:
                     vid_id = str(v["video_id"])
-                    entry: Dict[str, Any] = {"video_id": vid_id}
+                    entry: dict[str, Any] = {"video_id": vid_id}
                     if v.get("thumbnail_url"):
                         entry["thumbnail_url"] = v["thumbnail_url"]
                     else:
                         fetched_thumb = next(fetched_iter, None)
                         if fetched_thumb:
                             entry["thumbnail_url"] = fetched_thumb
-                            logger.info(
-                                f"Auto-fetched thumbnail for video {vid_id}: "
-                                f"{str(fetched_thumb)[:80]}..."
-                            )
+                            logger.info(f"Auto-fetched thumbnail for video {vid_id}: {str(fetched_thumb)[:80]}...")
                         else:
                             # Proceed without a thumbnail; Meta will return its own
                             # actionable error (1443226) if it actually requires one.
                             logger.warning(
-                                f"Could not auto-fetch thumbnail for video {vid_id}; "
-                                f"proceeding without thumbnail_url"
+                                f"Could not auto-fetch thumbnail for video {vid_id}; proceeding without thumbnail_url"
                             )
                     if v.get("label"):
                         entry["adlabels"] = [{"name": v["label"]}]
@@ -2309,13 +2336,10 @@ async def create_ad_creative(
                         cta_data["value"] = cta_value
                     video_data["call_to_action"] = cta_data
 
-                creative_data["object_story_spec"] = {
-                    "page_id": page_id,
-                    "video_data": video_data
-                }
+                creative_data["object_story_spec"] = {"page_id": page_id, "video_data": video_data}
             else:
                 # Use traditional object_story_spec with link_data for simple image creatives
-                link_data: Dict[str, Any] = {
+                link_data: dict[str, Any] = {
                     "image_hash": image_hash,
                 }
                 if link_url:
@@ -2380,9 +2404,7 @@ async def create_ad_creative(
         # Add Advantage+ Creative feature opt-ins if provided.
         # Only sent when the user explicitly passes creative_features_spec.
         if creative_features_spec:
-            creative_data["degrees_of_freedom_spec"] = {
-                "creative_features_spec": creative_features_spec
-            }
+            creative_data["degrees_of_freedom_spec"] = {"creative_features_spec": creative_features_spec}
 
         # Opt out of all Advantage+ Creative enhancements when requested.
         # Sets every known individual creative_features_spec key to OPT_OUT and
@@ -2428,20 +2450,24 @@ async def create_ad_creative(
                 if isinstance(inner_err, dict):
                     inner_msg = inner_err.get("message", "")
             if "valid Instagram account id" in inner_msg or "instagram_actor_id" in inner_msg.lower():
-                return json.dumps({
-                    "error": "Instagram account not authorized for advertising",
-                    "explanation": (
-                        "The Meta API rejected the Instagram account ID. This usually means "
-                        "your Facebook access token is missing the 'instagram_basic' permission, "
-                        "which is required to use Instagram placements in ad creatives."
-                    ),
-                    "fix": (
-                        "Reconnect your Facebook account at https://pipeboard.co/connections "
-                        "to refresh your access token with the required permissions."
-                    ),
-                    "instagram_actor_id": instagram_actor_id,
-                    "meta_error": inner_msg
-                }, indent=2)
+                return json.dumps(
+                    {
+                        "error": "Instagram account not authorized for advertising",
+                        "explanation": (
+                            "The Meta API rejected the Instagram account ID. This usually means "
+                            "your Facebook access token is missing the 'instagram_basic' permission, "
+                            "which is required to use Instagram placements in ad creatives."
+                        ),
+                        "fix": (
+                            "Re-authenticate (run `python -m meta_ads_mcp --login` or refresh your "
+                            "META_ACCESS_TOKEN) and ensure the new token includes the "
+                            "'instagram_basic' permission for the requesting Meta app."
+                        ),
+                        "instagram_actor_id": instagram_actor_id,
+                        "meta_error": inner_msg,
+                    },
+                    indent=2,
+                )
 
         # If successful, get more details about the created creative
         if "id" in data:
@@ -2458,12 +2484,15 @@ async def create_ad_creative(
                 "details": creative_details,
             }
 
-            posted_afs = creative_data.get("asset_feed_spec") if isinstance(creative_data.get("asset_feed_spec"), dict) else None
+            posted_afs = (
+                creative_data.get("asset_feed_spec") if isinstance(creative_data.get("asset_feed_spec"), dict) else None
+            )
             posted_images = posted_afs.get("images") if posted_afs else None
             posted_rules = posted_afs.get("asset_customization_rules") if posted_afs else None
             stored_afs = creative_details.get("asset_feed_spec") if isinstance(creative_details, dict) else None
             collapsed = bool(
-                posted_images and len(posted_images) > 1
+                posted_images
+                and len(posted_images) > 1
                 and posted_rules
                 and (not stored_afs or not stored_afs.get("images"))
             )
@@ -2498,30 +2527,27 @@ async def create_ad_creative(
 
     except Exception as e:
         logger.exception("create_ad_creative failed")
-        return json.dumps({
-            "error": "Failed to create ad creative",
-            "details": str(e)
-        }, indent=2)
+        return json.dumps({"error": "Failed to create ad creative", "details": str(e)}, indent=2)
 
 
 @mcp_server.tool()
 @meta_api_tool
 async def update_ad_creative(
     creative_id: str,
-    access_token: Optional[str] = None,
-    name: Optional[str] = None,
-    message: Optional[str] = None,
-    messages: Optional[List[str]] = None,
-    headline: Optional[str] = None,
-    headlines: Optional[List[str]] = None,
-    description: Optional[str] = None,
-    descriptions: Optional[List[str]] = None,
-    optimization_type: Optional[str] = None,
-    dynamic_creative_spec: Optional[Dict[str, Any]] = None,
-    call_to_action_type: Optional[str] = None,
-    lead_gen_form_id: Optional[Union[str, int]] = None,
-    ad_formats: Optional[List[str]] = None,
-    creative_features_spec: Optional[Dict[str, Any]] = None
+    access_token: str | None = None,
+    name: str | None = None,
+    message: str | None = None,
+    messages: list[str] | None = None,
+    headline: str | None = None,
+    headlines: list[str] | None = None,
+    description: str | None = None,
+    descriptions: list[str] | None = None,
+    optimization_type: str | None = None,
+    dynamic_creative_spec: dict[str, Any] | None = None,
+    call_to_action_type: str | None = None,
+    lead_gen_form_id: str | int | None = None,
+    ad_formats: list[str] | None = None,
+    creative_features_spec: dict[str, Any] | None = None,
 ) -> str:
     """
     Update an existing ad creative's name or optimization settings.
@@ -2564,18 +2590,36 @@ async def update_ad_creative(
 
     # Validate headline/description parameters - cannot mix simple and complex
     if headline and headlines:
-        return json.dumps({"error": "Cannot specify both 'headline' and 'headlines'. Use 'headline' for single headline or 'headlines' for multiple."}, indent=2)
+        return json.dumps(
+            {
+                "error": "Cannot specify both 'headline' and 'headlines'. Use 'headline' for single headline or 'headlines' for multiple."
+            },
+            indent=2,
+        )
 
     if description and descriptions:
-        return json.dumps({"error": "Cannot specify both 'description' and 'descriptions'. Use 'description' for single description or 'descriptions' for multiple."}, indent=2)
+        return json.dumps(
+            {
+                "error": "Cannot specify both 'description' and 'descriptions'. Use 'description' for single description or 'descriptions' for multiple."
+            },
+            indent=2,
+        )
 
     # Validate message / messages mutual exclusivity
     if message and messages:
-        return json.dumps({"error": "Cannot specify both 'message' and 'messages'. Use 'message' for single text or 'messages' for multiple variants."}, indent=2)
+        return json.dumps(
+            {
+                "error": "Cannot specify both 'message' and 'messages'. Use 'message' for single text or 'messages' for multiple variants."
+            },
+            indent=2,
+        )
 
     # Validate optimization_type
     if optimization_type and optimization_type != "DEGREES_OF_FREEDOM":
-        return json.dumps({"error": f"Invalid optimization_type '{optimization_type}'. Only 'DEGREES_OF_FREEDOM' is supported."}, indent=2)
+        return json.dumps(
+            {"error": f"Invalid optimization_type '{optimization_type}'. Only 'DEGREES_OF_FREEDOM' is supported."},
+            indent=2,
+        )
 
     # Validate dynamic creative parameters (plural forms only)
     if headlines:
@@ -2583,14 +2627,14 @@ async def update_ad_creative(
             return json.dumps({"error": "Maximum 5 headlines allowed for dynamic creatives"}, indent=2)
         for i, h in enumerate(headlines):
             if len(h) > 40:
-                return json.dumps({"error": f"Headline {i+1} exceeds 40 character limit"}, indent=2)
+                return json.dumps({"error": f"Headline {i + 1} exceeds 40 character limit"}, indent=2)
 
     if descriptions:
         if len(descriptions) > 5:
             return json.dumps({"error": "Maximum 5 descriptions allowed for dynamic creatives"}, indent=2)
         for i, d in enumerate(descriptions):
             if len(d) > 125:
-                return json.dumps({"error": f"Description {i+1} exceeds 125 character limit"}, indent=2)
+                return json.dumps({"error": f"Description {i + 1} exceeds 125 character limit"}, indent=2)
 
     # Prepare the update data
     update_data = {}
@@ -2648,31 +2692,31 @@ async def update_ad_creative(
         # Use traditional object_story_spec with link_data for simple creatives
         if message or headline or description or call_to_action_type or lead_gen_form_id:
             update_data["object_story_spec"] = {"link_data": {}}
-            
+
             if message:
                 update_data["object_story_spec"]["link_data"]["message"] = message
-            
+
             # Add headline (singular) to link_data
             if headline:
                 update_data["object_story_spec"]["link_data"]["name"] = headline
-            
+
             # Add description (singular) to link_data
             if description:
                 update_data["object_story_spec"]["link_data"]["description"] = description
-            
+
             # Add call_to_action to link_data for simple creatives
             if call_to_action_type or lead_gen_form_id:
                 cta_data = {}
                 if call_to_action_type:
                     cta_data["type"] = call_to_action_type
-                
+
                 # Add lead form ID to value object if provided (required for lead generation campaigns)
                 if lead_gen_form_id:
                     cta_data["value"] = {"lead_gen_form_id": lead_gen_form_id}
-                
+
                 if cta_data:
                     update_data["object_story_spec"]["link_data"]["call_to_action"] = cta_data
-    
+
     # Add dynamic creative spec if provided
     if dynamic_creative_spec:
         update_data["dynamic_creative_spec"] = dynamic_creative_spec
@@ -2700,11 +2744,7 @@ async def update_ad_creative(
             }
 
             creative_details = await make_api_request(creative_endpoint, access_token, creative_params)
-            return json.dumps({
-                "success": True,
-                "creative_id": creative_id,
-                "details": creative_details
-            }, indent=2)
+            return json.dumps({"success": True, "creative_id": creative_id, "details": creative_details}, indent=2)
 
         # Check for Meta API content update limitation (error_subcode 1815573)
         error_obj = data.get("error", {})
@@ -2719,30 +2759,31 @@ async def update_ad_creative(
             error_subcode = None
 
         if error_subcode == 1815573:
-            return json.dumps({
-                "error": "Content updates are not allowed on existing creatives",
-                "explanation": (
-                    "The Meta API does not allow updating content fields (message, headline, "
-                    "description, CTA, image, video, URL) on existing creatives. "
-                    "Only the creative 'name' can be changed."
-                ),
-                "workaround": (
-                    "To change ad content: (1) create a new creative with the desired content "
-                    "using create_ad_creative, then (2) call update_ad with the ad's ID and the "
-                    "new creative_id to swap it on the ad."
-                ),
-                "creative_id": creative_id,
-                "attempted_updates": update_data
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": "Content updates are not allowed on existing creatives",
+                    "explanation": (
+                        "The Meta API does not allow updating content fields (message, headline, "
+                        "description, CTA, image, video, URL) on existing creatives. "
+                        "Only the creative 'name' can be changed."
+                    ),
+                    "workaround": (
+                        "To change ad content: (1) create a new creative with the desired content "
+                        "using create_ad_creative, then (2) call update_ad with the ad's ID and the "
+                        "new creative_id to swap it on the ad."
+                    ),
+                    "creative_id": creative_id,
+                    "attempted_updates": update_data,
+                },
+                indent=2,
+            )
 
         return json.dumps(data, indent=2)
 
     except Exception as e:
-        return json.dumps({
-            "error": "Failed to update ad creative",
-            "details": str(e),
-            "update_data_sent": update_data
-        }, indent=2)
+        return json.dumps(
+            {"error": "Failed to update ad creative", "details": str(e), "update_data_sent": update_data}, indent=2
+        )
 
 
 async def _discover_pages_for_account(account_id: str, access_token: str) -> dict:
@@ -2755,11 +2796,11 @@ async def _discover_pages_for_account(account_id: str, access_token: str) -> dic
         endpoint = f"{account_id}/ads"
         params = {
             "fields": "id,name,adset_id,campaign_id,status,creative,created_time,updated_time,bid_amount,conversion_domain,tracking_specs",
-            "limit": 100
+            "limit": 100,
         }
-        
+
         tracking_ads_data = await make_api_request(endpoint, access_token, params)
-        
+
         tracking_page_ids = set()
         if "data" in tracking_ads_data:
             for ad in tracking_ads_data.get("data", []):
@@ -2772,15 +2813,13 @@ async def _discover_pages_for_account(account_id: str, access_token: str) -> dic
                                 for page_id in page_list:
                                     if isinstance(page_id, (str, int)) and str(page_id).isdigit():
                                         tracking_page_ids.add(str(page_id))
-        
+
         if tracking_page_ids:
             # Get details for the first page found
             page_id = list(tracking_page_ids)[0]
             page_endpoint = f"{page_id}"
-            page_params = {
-                "fields": "id,name,username,category,fan_count,link,verification_status,picture"
-            }
-            
+            page_params = {"fields": "id,name,username,category,fan_count,link,verification_status,picture"}
+
             page_data = await make_api_request(page_endpoint, access_token, page_params)
             if "id" in page_data:
                 return {
@@ -2788,67 +2827,59 @@ async def _discover_pages_for_account(account_id: str, access_token: str) -> dic
                     "page_id": page_id,
                     "page_name": page_data.get("name", "Unknown"),
                     "source": "tracking_specs",
-                    "note": "Page ID extracted from existing ads - most reliable for ad creation"
+                    "note": "Page ID extracted from existing ads - most reliable for ad creation",
                 }
-        
+
         # Approach 2: Try client_pages endpoint
         endpoint = f"{account_id}/client_pages"
-        params = {
-            "fields": "id,name,username,category,fan_count,link,verification_status,picture"
-        }
-        
+        params = {"fields": "id,name,username,category,fan_count,link,verification_status,picture"}
+
         client_pages_data = await make_api_request(endpoint, access_token, params)
-        
+
         if "data" in client_pages_data and client_pages_data["data"]:
             page = client_pages_data["data"][0]
             return {
                 "success": True,
                 "page_id": str(page["id"]),
                 "page_name": page.get("name", "Unknown"),
-                "source": "client_pages"
+                "source": "client_pages",
             }
-        
+
         # Approach 3: Try assigned_pages endpoint
         pages_endpoint = f"{account_id}/assigned_pages"
-        pages_params = {
-            "fields": "id,name",
-            "limit": 1 
-        }
-        
+        pages_params = {"fields": "id,name", "limit": 1}
+
         pages_data = await make_api_request(pages_endpoint, access_token, pages_params)
-        
+
         if "data" in pages_data and pages_data["data"]:
             page = pages_data["data"][0]
             return {
                 "success": True,
                 "page_id": str(page["id"]),
                 "page_name": page.get("name", "Unknown"),
-                "source": "assigned_pages"
+                "source": "assigned_pages",
             }
-        
+
         # If all approaches failed
         return {
             "success": False,
             "message": "No suitable pages found for this account",
-            "note": "Try using get_account_pages to see all available pages or provide page_id manually"
+            "note": "Try using get_account_pages to see all available pages or provide page_id manually",
         }
-        
+
     except Exception as e:
-        return {
-            "success": False,
-            "message": f"Error during page discovery: {str(e)}"
-        }
+        return {"success": False, "message": f"Error during page discovery: {str(e)}"}
 
 
 async def _search_pages_by_name_core(access_token: str, account_id: str, search_term: str = None) -> str:
     """
     Core logic for searching pages by name.
-    
+
     Args:
         access_token: Meta API access token
         account_id: Meta Ads account ID (format: act_XXXXXXXXX)
         search_term: Search term to find pages by name (optional - returns all pages if not provided)
-    
+
     Returns:
         JSON string with search results
     """
@@ -2857,72 +2888,78 @@ async def _search_pages_by_name_core(access_token: str, account_id: str, search_
     try:
         # Use the internal discovery function directly
         page_discovery_result = await _discover_pages_for_account(account_id, access_token)
-        
+
         if not page_discovery_result.get("success"):
-            return json.dumps({
-                "data": [],
-                "message": "No pages found for this account",
-                "details": page_discovery_result.get("message", "Page discovery failed")
-            }, indent=2)
-        
+            return json.dumps(
+                {
+                    "data": [],
+                    "message": "No pages found for this account",
+                    "details": page_discovery_result.get("message", "Page discovery failed"),
+                },
+                indent=2,
+            )
+
         # Create a single page result
         page_data = {
             "id": page_discovery_result["page_id"],
             "name": page_discovery_result.get("page_name", "Unknown"),
-            "source": page_discovery_result.get("source", "unknown")
+            "source": page_discovery_result.get("source", "unknown"),
         }
-        
+
         all_pages_data = {"data": [page_data]}
-        
+
         # Filter pages by search term if provided
         if search_term:
             search_term_lower = search_term.lower()
             filtered_pages = []
-            
+
             for page in all_pages_data["data"]:
                 page_name = page.get("name", "").lower()
                 if search_term_lower in page_name:
                     filtered_pages.append(page)
-            
-            return json.dumps({
-                "data": filtered_pages,
-                "search_term": search_term,
-                "total_found": len(filtered_pages),
-                "total_available": len(all_pages_data["data"])
-            }, indent=2)
+
+            return json.dumps(
+                {
+                    "data": filtered_pages,
+                    "search_term": search_term,
+                    "total_found": len(filtered_pages),
+                    "total_available": len(all_pages_data["data"]),
+                },
+                indent=2,
+            )
         else:
             # Return all pages if no search term provided
-            return json.dumps({
-                "data": all_pages_data["data"],
-                "total_available": len(all_pages_data["data"]),
-                "note": "Use search_term parameter to filter pages by name"
-            }, indent=2)
-    
+            return json.dumps(
+                {
+                    "data": all_pages_data["data"],
+                    "total_available": len(all_pages_data["data"]),
+                    "note": "Use search_term parameter to filter pages by name",
+                },
+                indent=2,
+            )
+
     except Exception as e:
-        return json.dumps({
-            "error": "Failed to search pages by name",
-            "details": str(e)
-        }, indent=2)
+        return json.dumps({"error": "Failed to search pages by name", "details": str(e)}, indent=2)
 
 
 @mcp_server.tool()
 @meta_api_tool
-async def search_pages_by_name(account_id: str, access_token: Optional[str] = None, search_term: Optional[str] = None) -> str:
+async def search_pages_by_name(account_id: str, access_token: str | None = None, search_term: str | None = None) -> str:
     """
     Search for pages by name within an account.
-    
+
     Args:
         account_id: Meta Ads account ID (format: act_XXXXXXXXX)
         access_token: Meta API access token (optional - will use cached token if not provided)
         search_term: Search term to find pages by name (optional - returns all pages if not provided)
-    
+
     Returns:
         JSON response with matching pages
     """
     # Check required parameters
     if not account_id:
         return json.dumps({"error": "No account ID provided"}, indent=2)
-    
+
     # Call the core function
     result = await _search_pages_by_name_core(access_token, account_id, search_term)
     return result
@@ -2930,49 +2967,42 @@ async def search_pages_by_name(account_id: str, access_token: Optional[str] = No
 
 @mcp_server.tool()
 @meta_api_tool
-async def get_account_pages(account_id: str, access_token: Optional[str] = None) -> str:
+async def get_account_pages(account_id: str, access_token: str | None = None) -> str:
     """
     Get pages associated with a Meta Ads account.
-    
+
     Args:
         account_id: Meta Ads account ID (format: act_XXXXXXXXX)
         access_token: Meta API access token (optional - will use cached token if not provided)
-    
+
     Returns:
         JSON response with pages associated with the account
     """
     # Check required parameters
     if not account_id:
         return json.dumps({"error": "No account ID provided"}, indent=2)
-    
+
     # Handle special case for 'me'
     if account_id == "me":
         try:
             endpoint = "me/accounts"
-            params = {
-                "fields": "id,name,username,category,fan_count,link,verification_status,picture"
-            }
-            
+            params = {"fields": "id,name,username,category,fan_count,link,verification_status,picture"}
+
             user_pages_data = await make_api_request(endpoint, access_token, params)
             return json.dumps(user_pages_data, indent=2)
         except Exception as e:
-            return json.dumps({
-                "error": "Failed to get user pages",
-                "details": str(e)
-            }, indent=2)
-    
+            return json.dumps({"error": "Failed to get user pages", "details": str(e)}, indent=2)
+
     account_id = ensure_act_prefix(account_id)
-    
+
     try:
         # Collect all page IDs from multiple approaches
         all_page_ids = set()
-        
+
         # Approach 1: Get user's personal pages (broad scope)
         try:
             endpoint = "me/accounts"
-            params = {
-                "fields": "id,name,username,category,fan_count,link,verification_status,picture"
-            }
+            params = {"fields": "id,name,username,category,fan_count,link,verification_status,picture"}
             user_pages_data = await make_api_request(endpoint, access_token, params)
             if "data" in user_pages_data:
                 for page in user_pages_data["data"]:
@@ -2980,15 +3010,13 @@ async def get_account_pages(account_id: str, access_token: Optional[str] = None)
                         all_page_ids.add(page["id"])
         except Exception:
             pass
-        
+
         # Approach 2: Try business manager pages
         try:
             # Strip 'act_' prefix to get raw account ID for business endpoints
             raw_account_id = account_id.replace("act_", "")
             endpoint = f"{raw_account_id}/owned_pages"
-            params = {
-                "fields": "id,name,username,category,fan_count,link,verification_status,picture"
-            }
+            params = {"fields": "id,name,username,category,fan_count,link,verification_status,picture"}
             business_pages_data = await make_api_request(endpoint, access_token, params)
             if "data" in business_pages_data:
                 for page in business_pages_data["data"]:
@@ -2996,13 +3024,11 @@ async def get_account_pages(account_id: str, access_token: Optional[str] = None)
                         all_page_ids.add(page["id"])
         except Exception:
             pass
-        
+
         # Approach 3: Try ad account client pages
         try:
             endpoint = f"{account_id}/client_pages"
-            params = {
-                "fields": "id,name,username,category,fan_count,link,verification_status,picture"
-            }
+            params = {"fields": "id,name,username,category,fan_count,link,verification_status,picture"}
             client_pages_data = await make_api_request(endpoint, access_token, params)
             if "data" in client_pages_data:
                 for page in client_pages_data["data"]:
@@ -3010,14 +3036,11 @@ async def get_account_pages(account_id: str, access_token: Optional[str] = None)
                         all_page_ids.add(page["id"])
         except Exception:
             pass
-        
+
         # Approach 4: Extract page IDs from all ad creatives (broader creative search)
         try:
             endpoint = f"{account_id}/adcreatives"
-            params = {
-                "fields": "id,name,object_story_spec,link_url,call_to_action,image_hash",
-                "limit": 100
-            }
+            params = {"fields": "id,name,object_story_spec,link_url,call_to_action,image_hash", "limit": 100}
             creatives_data = await make_api_request(endpoint, access_token, params)
             if "data" in creatives_data:
                 for creative in creatives_data["data"]:
@@ -3025,18 +3048,19 @@ async def get_account_pages(account_id: str, access_token: Optional[str] = None)
                         all_page_ids.add(creative["object_story_spec"]["page_id"])
         except Exception:
             pass
-            
+
         # Approach 5: Get active ads and extract page IDs from creatives
         try:
             endpoint = f"{account_id}/ads"
-            params = {
-                "fields": "creative{object_story_spec{page_id},link_url,call_to_action}",
-                "limit": 100
-            }
+            params = {"fields": "creative{object_story_spec{page_id},link_url,call_to_action}", "limit": 100}
             ads_data = await make_api_request(endpoint, access_token, params)
             if "data" in ads_data:
                 for ad in ads_data.get("data", []):
-                    if "creative" in ad and "object_story_spec" in ad["creative"] and "page_id" in ad["creative"]["object_story_spec"]:
+                    if (
+                        "creative" in ad
+                        and "object_story_spec" in ad["creative"]
+                        and "page_id" in ad["creative"]["object_story_spec"]
+                    ):
                         all_page_ids.add(ad["creative"]["object_story_spec"]["page_id"])
         except Exception:
             pass
@@ -3044,9 +3068,7 @@ async def get_account_pages(account_id: str, access_token: Optional[str] = None)
         # Approach 6: Try promoted_objects endpoint
         try:
             endpoint = f"{account_id}/promoted_objects"
-            params = {
-                "fields": "page_id,object_store_url,product_set_id,application_id"
-            }
+            params = {"fields": "page_id,object_store_url,product_set_id,application_id"}
             promoted_objects_data = await make_api_request(endpoint, access_token, params)
             if "data" in promoted_objects_data:
                 for obj in promoted_objects_data["data"]:
@@ -3058,10 +3080,7 @@ async def get_account_pages(account_id: str, access_token: Optional[str] = None)
         # Approach 7: Extract page IDs from tracking_specs in ads (most reliable)
         try:
             endpoint = f"{account_id}/ads"
-            params = {
-                "fields": "id,name,status,creative,tracking_specs",
-                "limit": 100
-            }
+            params = {"fields": "id,name,status,creative,tracking_specs", "limit": 100}
             tracking_ads_data = await make_api_request(endpoint, access_token, params)
             if "data" in tracking_ads_data:
                 for ad in tracking_ads_data.get("data", []):
@@ -3076,14 +3095,11 @@ async def get_account_pages(account_id: str, access_token: Optional[str] = None)
                                             all_page_ids.add(str(page_id))
         except Exception:
             pass
-            
+
         # Approach 8: Try campaigns and extract page info
         try:
             endpoint = f"{account_id}/campaigns"
-            params = {
-                "fields": "id,name,promoted_object,objective",
-                "limit": 50
-            }
+            params = {"fields": "id,name,promoted_object,objective", "limit": 50}
             campaigns_data = await make_api_request(endpoint, access_token, params)
             if "data" in campaigns_data:
                 for campaign in campaigns_data["data"]:
@@ -3091,52 +3107,36 @@ async def get_account_pages(account_id: str, access_token: Optional[str] = None)
                         all_page_ids.add(campaign["promoted_object"]["page_id"])
         except Exception:
             pass
-            
+
         # If we found any page IDs, get details for each
         if all_page_ids:
-            page_details = {
-                "data": [], 
-                "total_pages_found": len(all_page_ids)
-            }
-            
+            page_details = {"data": [], "total_pages_found": len(all_page_ids)}
+
             for page_id in all_page_ids:
                 try:
                     page_endpoint = f"{page_id}"
-                    page_params = {
-                        "fields": "id,name,username,category,fan_count,link,verification_status,picture"
-                    }
-                    
+                    page_params = {"fields": "id,name,username,category,fan_count,link,verification_status,picture"}
+
                     page_data = await make_api_request(page_endpoint, access_token, page_params)
                     if "id" in page_data:
                         page_details["data"].append(page_data)
                     else:
-                        page_details["data"].append({
-                            "id": page_id, 
-                            "error": "Page details not accessible"
-                        })
+                        page_details["data"].append({"id": page_id, "error": "Page details not accessible"})
                 except Exception as e:
-                    page_details["data"].append({
-                        "id": page_id,
-                        "error": f"Failed to get page details: {str(e)}"
-                    })
-            
+                    page_details["data"].append({"id": page_id, "error": f"Failed to get page details: {str(e)}"})
+
             if page_details["data"]:
                 return json.dumps(page_details, indent=2)
-        
+
         # If all approaches failed, return empty data with a message
-        return json.dumps({
-            "data": [],
-            "message": "No pages found associated with this account",
-            "suggestion": "Create a Facebook page and connect it to this ad account, or ensure existing pages are properly connected through Business Manager"
-        }, indent=2)
-        
+        return json.dumps(
+            {
+                "data": [],
+                "message": "No pages found associated with this account",
+                "suggestion": "Create a Facebook page and connect it to this ad account, or ensure existing pages are properly connected through Business Manager",
+            },
+            indent=2,
+        )
+
     except Exception as e:
-        return json.dumps({
-            "error": "Failed to get account pages",
-            "details": str(e)
-        }, indent=2)
-
-
-
-
-
+        return json.dumps({"error": "Failed to get account pages", "details": str(e)}, indent=2)

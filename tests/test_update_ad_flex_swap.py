@@ -4,9 +4,11 @@ Tests that update_ad provides clear, actionable error messages
 when Meta API rejects creative swaps on FLEX ads (error_subcode 3858355).
 """
 
-import pytest
 import json
 from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from meta_ads_mcp.core.ads import update_ad
 
 
@@ -38,23 +40,17 @@ class TestUpdateAdFlexSwap:
                         "type": "OAuthException",
                         "code": 100,
                         "error_subcode": 3858355,
-                        "fbtrace_id": "abc123"
+                        "fbtrace_id": "abc123",
                     }
                 },
-                "full_response": {
-                    "status_code": 400
-                }
+                "full_response": {"status_code": 400},
             }
         }
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = api_error
 
-            result = await update_ad(
-                ad_id="test_ad_123",
-                creative_id="new_creative_456",
-                access_token="test_token"
-            )
+            result = await update_ad(ad_id="test_ad_123", creative_id="new_creative_456", access_token="test_token")
 
             result_data = _unwrap_result(result)
             assert result_data["error"] == "Cannot swap creative on this ad due to FLEX image mismatch"
@@ -70,14 +66,10 @@ class TestUpdateAdFlexSwap:
 
         success_response = {"success": True}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = success_response
 
-            result = await update_ad(
-                ad_id="test_ad_123",
-                creative_id="new_creative_456",
-                access_token="test_token"
-            )
+            result = await update_ad(ad_id="test_ad_123", creative_id="new_creative_456", access_token="test_token")
 
             result_data = _unwrap_result(result)
             assert result_data["success"] is True
@@ -96,18 +88,14 @@ class TestUpdateAdFlexSwap:
                         "error_subcode": 9999,
                     }
                 },
-                "full_response": {"status_code": 400}
+                "full_response": {"status_code": 400},
             }
         }
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = api_error
 
-            result = await update_ad(
-                ad_id="test_ad_123",
-                creative_id="new_creative_456",
-                access_token="test_token"
-            )
+            result = await update_ad(ad_id="test_ad_123", creative_id="new_creative_456", access_token="test_token")
 
             result_data = _unwrap_result(result)
             # Should pass through the raw error, not the workaround message
@@ -119,14 +107,10 @@ class TestUpdateAdFlexSwap:
 
         success_response = {"success": True}
 
-        with patch('meta_ads_mcp.core.ads.make_api_request', new_callable=AsyncMock) as mock_api:
+        with patch("meta_ads_mcp.core.ads.make_api_request", new_callable=AsyncMock) as mock_api:
             mock_api.return_value = success_response
 
-            result = await update_ad(
-                ad_id="test_ad_123",
-                status="PAUSED",
-                access_token="test_token"
-            )
+            result = await update_ad(ad_id="test_ad_123", status="PAUSED", access_token="test_token")
 
             result_data = _unwrap_result(result)
             assert result_data["success"] is True

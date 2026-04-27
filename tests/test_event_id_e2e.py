@@ -1,7 +1,7 @@
 """End-to-end test for event_id parameter in create_ad_creative.
 
-Run manually with PIPEBOARD_API_TOKEN set:
-    PIPEBOARD_API_TOKEN=pk_xxx python tests/test_event_id_e2e.py
+Run manually with META_ACCESS_TOKEN set:
+    META_ACCESS_TOKEN=EAAB... python tests/test_event_id_e2e.py
 """
 
 import asyncio
@@ -23,8 +23,8 @@ EVENT_URL = f"https://www.facebook.com/events/{EVENT_ID}"
 
 
 async def main():
-    if not os.environ.get("PIPEBOARD_API_TOKEN"):
-        print("ERROR: PIPEBOARD_API_TOKEN not set")
+    if not os.environ.get("META_ACCESS_TOKEN"):
+        print("ERROR: META_ACCESS_TOKEN not set")
         sys.exit(1)
 
     create_fn = ads_module.create_ad_creative
@@ -51,7 +51,7 @@ async def main():
 
     creative_id = data.get("creative_id") or data.get("details", {}).get("id")
     if not creative_id:
-        print(f"\nFAIL: no creative_id in response")
+        print("\nFAIL: no creative_id in response")
         sys.exit(1)
 
     print(f"\n=== Read-back creative {creative_id} ===")

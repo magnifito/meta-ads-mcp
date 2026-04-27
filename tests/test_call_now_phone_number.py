@@ -1,8 +1,10 @@
 """Test that create_ad_creative passes phone_number for CALL_NOW CTAs."""
 
-import pytest
 import json
 from unittest.mock import patch
+
+import pytest
+
 from meta_ads_mcp.core.ads import create_ad_creative
 
 
@@ -10,21 +12,18 @@ from meta_ads_mcp.core.ads import create_ad_creative
 async def test_simple_image_call_now_includes_phone_number():
     """Simple image creative with CALL_NOW should include phone_number in CTA value."""
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
-        mock_discover.return_value = {
-            "success": True,
-            "page_id": "123456789",
-            "page_name": "Test Page"
-        }
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
+        mock_discover.return_value = {"success": True, "page_id": "123456789", "page_name": "Test Page"}
 
         mock_api.side_effect = [
             {"id": "creative_123"},
-            {"id": "creative_123", "name": "Test Creative", "status": "ACTIVE"}
+            {"id": "creative_123", "name": "Test Creative", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_701351919139047",
             image_hash="test_hash_123",
             name="Plumbing Call Ad",
@@ -33,7 +32,7 @@ async def test_simple_image_call_now_includes_phone_number():
             headline="Call Now",
             call_to_action_type="CALL_NOW",
             phone_number="+18005551234",
-            access_token="test_token"
+            access_token="test_token",
         )
 
         create_call_args = mock_api.call_args_list[0]
@@ -54,21 +53,18 @@ async def test_simple_image_call_now_includes_phone_number():
 async def test_simple_image_without_phone_number_has_no_phone_in_cta():
     """Simple image creative with LEARN_MORE should NOT include phone_number."""
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
-        mock_discover.return_value = {
-            "success": True,
-            "page_id": "123456789",
-            "page_name": "Test Page"
-        }
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
+        mock_discover.return_value = {"success": True, "page_id": "123456789", "page_name": "Test Page"}
 
         mock_api.side_effect = [
             {"id": "creative_456"},
-            {"id": "creative_456", "name": "Test Creative", "status": "ACTIVE"}
+            {"id": "creative_456", "name": "Test Creative", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_701351919139047",
             image_hash="test_hash_456",
             name="Regular Ad",
@@ -76,7 +72,7 @@ async def test_simple_image_without_phone_number_has_no_phone_in_cta():
             message="Learn more about us",
             headline="Learn More",
             call_to_action_type="LEARN_MORE",
-            access_token="test_token"
+            access_token="test_token",
         )
 
         create_call_args = mock_api.call_args_list[0]
@@ -95,21 +91,18 @@ async def test_simple_image_without_phone_number_has_no_phone_in_cta():
 async def test_dof_image_call_now_includes_phone_number():
     """DOF (DEGREES_OF_FREEDOM) image creative with CALL_NOW should include phone_number."""
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
-        mock_discover.return_value = {
-            "success": True,
-            "page_id": "123456789",
-            "page_name": "Test Page"
-        }
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
+        mock_discover.return_value = {"success": True, "page_id": "123456789", "page_name": "Test Page"}
 
         mock_api.side_effect = [
             {"id": "creative_789"},
-            {"id": "creative_789", "name": "DOF Creative", "status": "ACTIVE"}
+            {"id": "creative_789", "name": "DOF Creative", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_701351919139047",
             image_hashes=["hash_a"],
             name="Plumbing DOF Call Ad",
@@ -119,7 +112,7 @@ async def test_dof_image_call_now_includes_phone_number():
             call_to_action_type="CALL_NOW",
             optimization_type="DEGREES_OF_FREEDOM",
             phone_number="+18005551234",
-            access_token="test_token"
+            access_token="test_token",
         )
 
         create_call_args = mock_api.call_args_list[0]
@@ -139,14 +132,11 @@ async def test_dof_image_call_now_includes_phone_number():
 async def test_simple_video_call_now_includes_phone_number():
     """Simple video creative with CALL_NOW should include phone_number in CTA value."""
 
-    with patch('meta_ads_mcp.core.ads.make_api_request') as mock_api, \
-         patch('meta_ads_mcp.core.ads._discover_pages_for_account') as mock_discover:
-
-        mock_discover.return_value = {
-            "success": True,
-            "page_id": "123456789",
-            "page_name": "Test Page"
-        }
+    with (
+        patch("meta_ads_mcp.core.ads.make_api_request") as mock_api,
+        patch("meta_ads_mcp.core.ads._discover_pages_for_account") as mock_discover,
+    ):
+        mock_discover.return_value = {"success": True, "page_id": "123456789", "page_name": "Test Page"}
 
         mock_api.side_effect = [
             # First call: fetch video thumbnail (picture field)
@@ -154,10 +144,10 @@ async def test_simple_video_call_now_includes_phone_number():
             # Second call: create creative
             {"id": "creative_vid1"},
             # Third call: get creative details
-            {"id": "creative_vid1", "name": "Video Call Ad", "status": "ACTIVE"}
+            {"id": "creative_vid1", "name": "Video Call Ad", "status": "ACTIVE"},
         ]
 
-        result = await create_ad_creative(
+        await create_ad_creative(
             account_id="act_701351919139047",
             video_id="video_123",
             name="Plumbing Video Call Ad",
@@ -166,7 +156,7 @@ async def test_simple_video_call_now_includes_phone_number():
             headline="Call Now",
             call_to_action_type="CALL_NOW",
             phone_number="+18005551234",
-            access_token="test_token"
+            access_token="test_token",
         )
 
         # Index 1 because index 0 is the video thumbnail fetch

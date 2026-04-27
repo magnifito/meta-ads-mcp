@@ -1,18 +1,18 @@
 """Ad Set-related functionality for Meta Ads API."""
 
 import json
-from typing import Optional, Dict, Any, List
-from .api import meta_api_tool, make_api_request, ensure_act_prefix
-from .accounts import get_ad_accounts
+from typing import Any
+
+from .api import ensure_act_prefix, make_api_request, meta_api_tool
 from .server import mcp_server
 
 
 @mcp_server.tool()
 @meta_api_tool
-async def get_adsets(account_id: str, access_token: Optional[str] = None, limit: int = 10, campaign_id: str = "") -> str:
+async def get_adsets(account_id: str, access_token: str | None = None, limit: int = 10, campaign_id: str = "") -> str:
     """
     Get ad sets for a Meta Ads account with optional filtering by campaign.
-    
+
     Args:
         account_id: Meta Ads account ID (format: act_XXXXXXXXX)
         access_token: Meta API access token (optional - will use cached token if not provided)
@@ -30,33 +30,33 @@ async def get_adsets(account_id: str, access_token: Optional[str] = None, limit:
         endpoint = f"{campaign_id}/adsets"
         params = {
             "fields": "id,name,campaign_id,status,daily_budget,lifetime_budget,targeting,bid_amount,bid_adjustments,bid_strategy,bid_constraints,optimization_goal,billing_event,start_time,end_time,created_time,updated_time,is_dynamic_creative,frequency_control_specs{event,interval_days,max_frequency},regional_regulated_categories,regional_regulation_identities",
-            "limit": limit
+            "limit": limit,
         }
     else:
         # Use account endpoint if no campaign_id is given
         endpoint = f"{account_id}/adsets"
         params = {
             "fields": "id,name,campaign_id,status,daily_budget,lifetime_budget,targeting,bid_amount,bid_adjustments,bid_strategy,bid_constraints,optimization_goal,billing_event,start_time,end_time,created_time,updated_time,is_dynamic_creative,frequency_control_specs{event,interval_days,max_frequency},regional_regulated_categories,regional_regulation_identities",
-            "limit": limit
+            "limit": limit,
         }
-        # Note: Removed the attempt to add campaign_id to params for the account endpoint case, 
+        # Note: Removed the attempt to add campaign_id to params for the account endpoint case,
         # as it was ineffective and the logic now uses the correct endpoint for campaign filtering.
 
     data = await make_api_request(endpoint, access_token, params)
-    
+
     return json.dumps(data, indent=2)
 
 
 @mcp_server.tool()
 @meta_api_tool
-async def get_adset_details(adset_id: str, access_token: Optional[str] = None) -> str:
+async def get_adset_details(adset_id: str, access_token: str | None = None) -> str:
     """
     Get detailed information about a specific ad set.
-    
+
     Args:
         adset_id: Meta Ads ad set ID
         access_token: Meta API access token (optional - will use cached token if not provided)
-    
+
     Example:
         To call this function through MCP, pass the adset_id as the first argument:
         {
@@ -65,53 +65,53 @@ async def get_adset_details(adset_id: str, access_token: Optional[str] = None) -
     """
     if not adset_id:
         return json.dumps({"error": "No ad set ID provided"}, indent=2)
-    
+
     endpoint = f"{adset_id}"
     # Explicitly prioritize frequency_control_specs in the fields request
     params = {
         "fields": "id,name,campaign_id,status,frequency_control_specs{event,interval_days,max_frequency},daily_budget,lifetime_budget,targeting,bid_amount,bid_adjustments,bid_strategy,bid_constraints,optimization_goal,billing_event,start_time,end_time,created_time,updated_time,attribution_spec,destination_type,promoted_object,pacing_type,budget_remaining,dsa_beneficiary,dsa_payor,is_dynamic_creative,regional_regulated_categories,regional_regulation_identities"
     }
-    
+
     data = await make_api_request(endpoint, access_token, params)
-    
+
     # For debugging - check if frequency_control_specs was returned
-    if 'frequency_control_specs' not in data:
-        data['_meta'] = {
-            'note': 'No frequency_control_specs field was returned by the API. This means either no frequency caps are set or the API did not include this field in the response.'
+    if "frequency_control_specs" not in data:
+        data["_meta"] = {
+            "note": "No frequency_control_specs field was returned by the API. This means either no frequency caps are set or the API did not include this field in the response."
         }
-    
+
     return json.dumps(data, indent=2)
 
 
 @mcp_server.tool()
 @meta_api_tool
 async def create_adset(
-    account_id: str, 
-    campaign_id: str, 
+    account_id: str,
+    campaign_id: str,
     name: str,
     optimization_goal: str,
     billing_event: str,
     status: str = "PAUSED",
-    daily_budget: Optional[int] = None,
-    lifetime_budget: Optional[int] = None,
-    targeting: Optional[Dict[str, Any]] = None,
-    bid_amount: Optional[int] = None,
-    bid_strategy: Optional[str] = None,
-    bid_constraints: Optional[Dict[str, Any]] = None,
-    bid_adjustments: Optional[Dict[str, Any]] = None,
-    start_time: Optional[str] = None,
-    end_time: Optional[str] = None,
-    dsa_beneficiary: Optional[str] = None,
-    dsa_payor: Optional[str] = None,
-    promoted_object: Optional[Dict[str, Any]] = None,
-    destination_type: Optional[str] = None,
-    is_dynamic_creative: Optional[bool] = None,
-    frequency_control_specs: Optional[List[Dict[str, Any]]] = None,
-    multi_advertiser_ads: Optional[int] = None,
-    regional_regulated_categories: Optional[List[str]] = None,
-    regional_regulation_identities: Optional[Dict[str, Any]] = None,
-    attribution_spec: Optional[List[Dict[str, Any]]] = None,
-    access_token: Optional[str] = None
+    daily_budget: int | None = None,
+    lifetime_budget: int | None = None,
+    targeting: dict[str, Any] | None = None,
+    bid_amount: int | None = None,
+    bid_strategy: str | None = None,
+    bid_constraints: dict[str, Any] | None = None,
+    bid_adjustments: dict[str, Any] | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    dsa_beneficiary: str | None = None,
+    dsa_payor: str | None = None,
+    promoted_object: dict[str, Any] | None = None,
+    destination_type: str | None = None,
+    is_dynamic_creative: bool | None = None,
+    frequency_control_specs: list[dict[str, Any]] | None = None,
+    multi_advertiser_ads: int | None = None,
+    regional_regulated_categories: list[str] | None = None,
+    regional_regulation_identities: dict[str, Any] | None = None,
+    attribution_spec: list[dict[str, Any]] | None = None,
+    access_token: str | None = None,
 ) -> str:
     """
     Create a new ad set in a Meta Ads account.
@@ -220,60 +220,78 @@ async def create_adset(
 
     if not campaign_id:
         return json.dumps({"error": "No campaign ID provided"}, indent=2)
-    
+
     if not name:
         return json.dumps({"error": "No ad set name provided"}, indent=2)
-    
+
     if not optimization_goal:
         return json.dumps({"error": "No optimization goal provided"}, indent=2)
-    
+
     if not billing_event:
         return json.dumps({"error": "No billing event provided"}, indent=2)
-    
+
     # Validate mobile app parameters for APP_INSTALLS campaigns
     if optimization_goal == "APP_INSTALLS":
         if not promoted_object:
-            return json.dumps({
-                "error": "promoted_object is required for APP_INSTALLS optimization goal",
-                "details": "Mobile app campaigns must specify which app is being promoted",
-                "required_fields": ["application_id", "object_store_url"]
-            }, indent=2)
-        
+            return json.dumps(
+                {
+                    "error": "promoted_object is required for APP_INSTALLS optimization goal",
+                    "details": "Mobile app campaigns must specify which app is being promoted",
+                    "required_fields": ["application_id", "object_store_url"],
+                },
+                indent=2,
+            )
+
         # Validate promoted_object structure
         if not isinstance(promoted_object, dict):
-            return json.dumps({
-                "error": "promoted_object must be a dictionary",
-                "example": {"application_id": "123456789012345", "object_store_url": "https://apps.apple.com/app/id123456789"}
-            }, indent=2)
-        
+            return json.dumps(
+                {
+                    "error": "promoted_object must be a dictionary",
+                    "example": {
+                        "application_id": "123456789012345",
+                        "object_store_url": "https://apps.apple.com/app/id123456789",
+                    },
+                },
+                indent=2,
+            )
+
         # Validate required promoted_object fields
         if "application_id" not in promoted_object:
-            return json.dumps({
-                "error": "promoted_object missing required field: application_id",
-                "details": "application_id is the Facebook app ID for your mobile app"
-            }, indent=2)
-        
+            return json.dumps(
+                {
+                    "error": "promoted_object missing required field: application_id",
+                    "details": "application_id is the Facebook app ID for your mobile app",
+                },
+                indent=2,
+            )
+
         if "object_store_url" not in promoted_object:
-            return json.dumps({
-                "error": "promoted_object missing required field: object_store_url", 
-                "details": "object_store_url should be the App Store or Google Play URL for your app"
-            }, indent=2)
-        
+            return json.dumps(
+                {
+                    "error": "promoted_object missing required field: object_store_url",
+                    "details": "object_store_url should be the App Store or Google Play URL for your app",
+                },
+                indent=2,
+            )
+
         # Validate store URL format
         store_url = promoted_object["object_store_url"]
         valid_store_patterns = [
             "apps.apple.com",  # iOS App Store
             "play.google.com",  # Google Play Store
-            "itunes.apple.com"  # Alternative iOS format
+            "itunes.apple.com",  # Alternative iOS format
         ]
-        
+
         if not any(pattern in store_url for pattern in valid_store_patterns):
-            return json.dumps({
-                "error": "Invalid object_store_url format",
-                "details": "URL must be from App Store (apps.apple.com) or Google Play (play.google.com)",
-                "provided_url": store_url
-            }, indent=2)
-    
+            return json.dumps(
+                {
+                    "error": "Invalid object_store_url format",
+                    "details": "URL must be from App Store (apps.apple.com) or Google Play (play.google.com)",
+                    "provided_url": store_url,
+                },
+                indent=2,
+            )
+
     # destination_type is passed through to Meta's API without client-side validation.
     # Meta supports 23+ values (WHATSAPP, MESSENGER, INSTAGRAM_DIRECT, ON_AD, WEBSITE,
     # APP, FACEBOOK, SHOP_AUTOMATIC, multi-channel MESSAGING_* combos, etc.)
@@ -286,7 +304,7 @@ async def create_adset(
             "age_min": 18,
             "age_max": 65,
             "geo_locations": {"countries": ["US"]},
-            "targeting_automation": {"advantage_audience": 1}
+            "targeting_automation": {"advantage_audience": 1},
         }
 
     # Meta API v24+ requires targeting_automation.advantage_audience.
@@ -298,49 +316,58 @@ async def create_adset(
 
     # Bid strategies that require bid_amount (not bid_constraints)
     strategies_requiring_bid_amount = [
-        'LOWEST_COST_WITH_BID_CAP',
-        'COST_CAP',
-        'TARGET_COST',
+        "LOWEST_COST_WITH_BID_CAP",
+        "COST_CAP",
+        "TARGET_COST",
     ]
 
     # Validate bid_strategy and bid_amount requirements
     if bid_strategy:
         # Check for invalid 'LOWEST_COST' value (common mistake)
-        if bid_strategy == 'LOWEST_COST':
-            return json.dumps({
-                "error": "'LOWEST_COST' is not a valid bid_strategy value",
-                "details": "The 'LOWEST_COST' bid strategy is not valid in Meta Ads API v24.0",
-                "workaround": "Use 'LOWEST_COST_WITHOUT_CAP' instead (no bid_amount required)",
-                "valid_values": [
-                    "LOWEST_COST_WITHOUT_CAP (recommended - no bid_amount required)",
-                    "LOWEST_COST_WITH_BID_CAP (requires bid_amount)",
-                    "COST_CAP (requires bid_amount)",
-                    "LOWEST_COST_WITH_MIN_ROAS (requires bid_constraints with roas_average_floor)"
-                ],
-                "example": '{"bid_strategy": "LOWEST_COST_WITHOUT_CAP"}'
-            }, indent=2)
+        if bid_strategy == "LOWEST_COST":
+            return json.dumps(
+                {
+                    "error": "'LOWEST_COST' is not a valid bid_strategy value",
+                    "details": "The 'LOWEST_COST' bid strategy is not valid in Meta Ads API v24.0",
+                    "workaround": "Use 'LOWEST_COST_WITHOUT_CAP' instead (no bid_amount required)",
+                    "valid_values": [
+                        "LOWEST_COST_WITHOUT_CAP (recommended - no bid_amount required)",
+                        "LOWEST_COST_WITH_BID_CAP (requires bid_amount)",
+                        "COST_CAP (requires bid_amount)",
+                        "LOWEST_COST_WITH_MIN_ROAS (requires bid_constraints with roas_average_floor)",
+                    ],
+                    "example": '{"bid_strategy": "LOWEST_COST_WITHOUT_CAP"}',
+                },
+                indent=2,
+            )
 
         if bid_strategy in strategies_requiring_bid_amount and bid_amount is None:
-            return json.dumps({
-                "error": f"bid_amount is required when using bid_strategy '{bid_strategy}'",
-                "details": f"The '{bid_strategy}' bid strategy requires you to specify a bid amount in cents",
-                "workaround": "Either provide the bid_amount parameter, or use bid_strategy='LOWEST_COST_WITHOUT_CAP' which does not require a bid amount",
-                "example_with_bid_amount": f'{{"bid_strategy": "{bid_strategy}", "bid_amount": 500}}',
-                "example_without_bid_amount": '{"bid_strategy": "LOWEST_COST_WITHOUT_CAP"}'
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": f"bid_amount is required when using bid_strategy '{bid_strategy}'",
+                    "details": f"The '{bid_strategy}' bid strategy requires you to specify a bid amount in cents",
+                    "workaround": "Either provide the bid_amount parameter, or use bid_strategy='LOWEST_COST_WITHOUT_CAP' which does not require a bid amount",
+                    "example_with_bid_amount": f'{{"bid_strategy": "{bid_strategy}", "bid_amount": 500}}',
+                    "example_without_bid_amount": '{"bid_strategy": "LOWEST_COST_WITHOUT_CAP"}',
+                },
+                indent=2,
+            )
 
         # LOWEST_COST_WITH_MIN_ROAS requires bid_constraints with roas_average_floor
-        if bid_strategy == 'LOWEST_COST_WITH_MIN_ROAS' and not bid_constraints:
-            return json.dumps({
-                "error": "bid_constraints is required when using bid_strategy 'LOWEST_COST_WITH_MIN_ROAS'",
-                "details": "Provide bid_constraints with roas_average_floor (target ROAS * 10000)",
-                "example": '{"bid_strategy": "LOWEST_COST_WITH_MIN_ROAS", "bid_constraints": {"roas_average_floor": 20000}, "optimization_goal": "VALUE"}'
-            }, indent=2)
+        if bid_strategy == "LOWEST_COST_WITH_MIN_ROAS" and not bid_constraints:
+            return json.dumps(
+                {
+                    "error": "bid_constraints is required when using bid_strategy 'LOWEST_COST_WITH_MIN_ROAS'",
+                    "details": "Provide bid_constraints with roas_average_floor (target ROAS * 10000)",
+                    "example": '{"bid_strategy": "LOWEST_COST_WITH_MIN_ROAS", "bid_constraints": {"roas_average_floor": 20000}, "optimization_goal": "VALUE"}',
+                },
+                indent=2,
+            )
 
     # Pre-flight check: fetch campaign data to catch common errors before hitting Meta's API.
     # Triggered when the user provides a budget (CBO conflict check) or omits bid_amount
     # (bid strategy compatibility check). A single API call covers both checks.
-    needs_campaign_check = (daily_budget is not None or lifetime_budget is not None or bid_amount is None)
+    needs_campaign_check = daily_budget is not None or lifetime_budget is not None or bid_amount is None
     if needs_campaign_check:
         try:
             campaign_data = await make_api_request(
@@ -356,12 +383,15 @@ async def create_adset(
                 campaign_lifetime_budget = campaign_data.get("lifetime_budget")
                 if campaign_daily_budget or campaign_lifetime_budget:
                     budget_type = "daily_budget" if campaign_daily_budget else "lifetime_budget"
-                    return json.dumps({
-                        "error": f"Budget conflict: campaign '{campaign_name}' ({campaign_id}) already has a {budget_type} set (Campaign Budget Optimization / CBO).",
-                        "details": "Meta does not allow budgets at both the campaign and ad set level. When a campaign uses CBO, its ad sets must not specify daily_budget or lifetime_budget.",
-                        "fix": "Remove daily_budget and lifetime_budget from your create_adset call. The ad set will automatically use the campaign budget.",
-                        "alternative": "To use ad set-level budgets (ABO), you would need to create a campaign without a campaign-level budget."
-                    }, indent=2)
+                    return json.dumps(
+                        {
+                            "error": f"Budget conflict: campaign '{campaign_name}' ({campaign_id}) already has a {budget_type} set (Campaign Budget Optimization / CBO).",
+                            "details": "Meta does not allow budgets at both the campaign and ad set level. When a campaign uses CBO, its ad sets must not specify daily_budget or lifetime_budget.",
+                            "fix": "Remove daily_budget and lifetime_budget from your create_adset call. The ad set will automatically use the campaign budget.",
+                            "alternative": "To use ad set-level budgets (ABO), you would need to create a campaign without a campaign-level budget.",
+                        },
+                        indent=2,
+                    )
 
             # Check 2: Campaign bid strategy requires bid_amount.
             # This prevents a confusing error from Meta's API when the campaign-level
@@ -369,38 +399,43 @@ async def create_adset(
             if bid_amount is None:
                 campaign_bid_strategy = campaign_data.get("bid_strategy")
                 if campaign_bid_strategy and campaign_bid_strategy in strategies_requiring_bid_amount:
-                    return json.dumps({
-                        "error": f"bid_amount is required because the parent campaign uses bid_strategy '{campaign_bid_strategy}'",
-                        "details": f"Campaign '{campaign_name}' ({campaign_id}) uses '{campaign_bid_strategy}', which requires all child ad sets to provide a bid_amount (in cents).",
-                        "workaround": "Either provide the bid_amount parameter, or change the campaign's bid_strategy to 'LOWEST_COST_WITHOUT_CAP'",
-                        "example_with_bid_amount": f'{{"bid_amount": 500}}  (= $5.00 bid cap)',
-                        "example_without_bid_amount": 'Change campaign bid strategy: update_campaign(campaign_id="' + campaign_id + '", bid_strategy="LOWEST_COST_WITHOUT_CAP")'
-                    }, indent=2)
+                    return json.dumps(
+                        {
+                            "error": f"bid_amount is required because the parent campaign uses bid_strategy '{campaign_bid_strategy}'",
+                            "details": f"Campaign '{campaign_name}' ({campaign_id}) uses '{campaign_bid_strategy}', which requires all child ad sets to provide a bid_amount (in cents).",
+                            "workaround": "Either provide the bid_amount parameter, or change the campaign's bid_strategy to 'LOWEST_COST_WITHOUT_CAP'",
+                            "example_with_bid_amount": '{"bid_amount": 500}  (= $5.00 bid cap)',
+                            "example_without_bid_amount": 'Change campaign bid strategy: update_campaign(campaign_id="'
+                            + campaign_id
+                            + '", bid_strategy="LOWEST_COST_WITHOUT_CAP")',
+                        },
+                        indent=2,
+                    )
         except Exception:
             pass  # If the pre-flight check fails, let the create request proceed normally
 
     endpoint = f"{account_id}/adsets"
-    
+
     params = {
         "name": name,
         "campaign_id": campaign_id,
         "status": status,
         "optimization_goal": optimization_goal,
         "billing_event": billing_event,
-        "targeting": json.dumps(targeting)  # Properly format as JSON string
+        "targeting": json.dumps(targeting),  # Properly format as JSON string
     }
-    
+
     # Convert budget values to strings if they aren't already
     if daily_budget is not None:
         params["daily_budget"] = str(daily_budget)
-    
+
     if lifetime_budget is not None:
         params["lifetime_budget"] = str(lifetime_budget)
-    
+
     # Add other parameters if provided
     if bid_amount is not None:
         params["bid_amount"] = str(bid_amount)
-    
+
     if bid_strategy:
         params["bid_strategy"] = bid_strategy
 
@@ -412,10 +447,10 @@ async def create_adset(
 
     if start_time:
         params["start_time"] = start_time
-    
+
     if end_time:
         params["end_time"] = end_time
-    
+
     # Add DSA fields if provided (both required for EU-targeted ad sets)
     if dsa_beneficiary:
         params["dsa_beneficiary"] = dsa_beneficiary
@@ -425,10 +460,10 @@ async def create_adset(
     # Add mobile app parameters if provided
     if promoted_object:
         params["promoted_object"] = json.dumps(promoted_object)
-    
+
     if destination_type:
         params["destination_type"] = destination_type
-    
+
     # Enable Dynamic Creative if requested
     if is_dynamic_creative is not None:
         params["is_dynamic_creative"] = "true" if bool(is_dynamic_creative) else "false"
@@ -456,52 +491,69 @@ async def create_adset(
 
         # Enhanced error handling for DSA beneficiary issues
         if "permission" in error_msg.lower() or "insufficient" in error_msg.lower():
-            return json.dumps({
-                "error": "Insufficient permissions to set DSA beneficiary. Please ensure you have business_management permissions.",
-                "details": error_msg,
-                "params_sent": params,
-                "permission_required": True
-            }, indent=2)
-        elif "dsa_beneficiary" in error_msg.lower() and ("not supported" in error_msg.lower() or "parameter" in error_msg.lower()):
-            return json.dumps({
-                "error": "DSA beneficiary parameter not supported in this API version. Please set DSA beneficiary manually in Facebook Ads Manager.",
-                "details": error_msg,
-                "params_sent": params,
-                "manual_setup_required": True
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": "Insufficient permissions to set DSA beneficiary. Please ensure you have business_management permissions.",
+                    "details": error_msg,
+                    "params_sent": params,
+                    "permission_required": True,
+                },
+                indent=2,
+            )
+        elif "dsa_beneficiary" in error_msg.lower() and (
+            "not supported" in error_msg.lower() or "parameter" in error_msg.lower()
+        ):
+            return json.dumps(
+                {
+                    "error": "DSA beneficiary parameter not supported in this API version. Please set DSA beneficiary manually in Facebook Ads Manager.",
+                    "details": error_msg,
+                    "params_sent": params,
+                    "manual_setup_required": True,
+                },
+                indent=2,
+            )
         elif "benefits from ads" in error_msg or "DSA beneficiary" in error_msg:
-            return json.dumps({
-                "error": "DSA beneficiary required for European compliance. Please provide the person or organization that benefits from ads in this ad set.",
-                "details": error_msg,
-                "params_sent": params,
-                "dsa_required": True
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": "DSA beneficiary required for European compliance. Please provide the person or organization that benefits from ads in this ad set.",
+                    "details": error_msg,
+                    "params_sent": params,
+                    "dsa_required": True,
+                },
+                indent=2,
+            )
         else:
-            return json.dumps({
-                "error": "Failed to create ad set",
-                "details": error_msg,
-                "params_sent": params
-            }, indent=2)
+            return json.dumps(
+                {"error": "Failed to create ad set", "details": error_msg, "params_sent": params}, indent=2
+            )
 
 
 @mcp_server.tool()
 @meta_api_tool
-async def update_adset(adset_id: str, frequency_control_specs: Optional[List[Dict[str, Any]]] = None, bid_strategy: Optional[str] = None,
-                        bid_amount: Optional[int] = None, bid_constraints: Optional[Dict[str, Any]] = None,
-                        bid_adjustments: Optional[Dict[str, Any]] = None,
-                        name: Optional[str] = None,
-                        status: Optional[str] = None, targeting: Optional[Dict[str, Any]] = None,
-                        optimization_goal: Optional[str] = None, daily_budget: Optional[int] = None, lifetime_budget: Optional[int] = None,
-                        is_dynamic_creative: Optional[bool] = None,
-                        start_time: Optional[str] = None,
-                        end_time: Optional[str] = None,
-                        dsa_beneficiary: Optional[str] = None,
-                        dsa_payor: Optional[str] = None,
-                        multi_advertiser_ads: Optional[int] = None,
-                        regional_regulated_categories: Optional[List[str]] = None,
-                        regional_regulation_identities: Optional[Dict[str, Any]] = None,
-                        attribution_spec: Optional[List[Dict[str, Any]]] = None,
-                        access_token: Optional[str] = None) -> str:
+async def update_adset(
+    adset_id: str,
+    frequency_control_specs: list[dict[str, Any]] | None = None,
+    bid_strategy: str | None = None,
+    bid_amount: int | None = None,
+    bid_constraints: dict[str, Any] | None = None,
+    bid_adjustments: dict[str, Any] | None = None,
+    name: str | None = None,
+    status: str | None = None,
+    targeting: dict[str, Any] | None = None,
+    optimization_goal: str | None = None,
+    daily_budget: int | None = None,
+    lifetime_budget: int | None = None,
+    is_dynamic_creative: bool | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    dsa_beneficiary: str | None = None,
+    dsa_payor: str | None = None,
+    multi_advertiser_ads: int | None = None,
+    regional_regulated_categories: list[str] | None = None,
+    regional_regulation_identities: dict[str, Any] | None = None,
+    attribution_spec: list[dict[str, Any]] | None = None,
+    access_token: str | None = None,
+) -> str:
     """
     Update an ad set with new settings including frequency caps and budgets.
 
@@ -560,120 +612,129 @@ async def update_adset(adset_id: str, frequency_control_specs: Optional[List[Dic
     """
     if not adset_id:
         return json.dumps({"error": "No ad set ID provided"}, indent=2)
-    
+
     # Validate bid_strategy if provided
     if bid_strategy is not None:
         # Check for invalid 'LOWEST_COST' value (common mistake)
-        if bid_strategy == 'LOWEST_COST':
-            return json.dumps({
-                "error": "'LOWEST_COST' is not a valid bid_strategy value",
-                "details": "The 'LOWEST_COST' bid strategy is not valid in Meta Ads API v24.0",
-                "workaround": "Use 'LOWEST_COST_WITHOUT_CAP' instead (no bid_amount required)",
-                "valid_values": [
-                    "LOWEST_COST_WITHOUT_CAP (recommended - no bid_amount required)",
-                    "LOWEST_COST_WITH_BID_CAP (requires bid_amount)",
-                    "COST_CAP (requires bid_amount)",
-                    "LOWEST_COST_WITH_MIN_ROAS (requires bid_constraints with roas_average_floor)"
-                ],
-                "example": '{"bid_strategy": "LOWEST_COST_WITHOUT_CAP"}'
-            }, indent=2)
+        if bid_strategy == "LOWEST_COST":
+            return json.dumps(
+                {
+                    "error": "'LOWEST_COST' is not a valid bid_strategy value",
+                    "details": "The 'LOWEST_COST' bid strategy is not valid in Meta Ads API v24.0",
+                    "workaround": "Use 'LOWEST_COST_WITHOUT_CAP' instead (no bid_amount required)",
+                    "valid_values": [
+                        "LOWEST_COST_WITHOUT_CAP (recommended - no bid_amount required)",
+                        "LOWEST_COST_WITH_BID_CAP (requires bid_amount)",
+                        "COST_CAP (requires bid_amount)",
+                        "LOWEST_COST_WITH_MIN_ROAS (requires bid_constraints with roas_average_floor)",
+                    ],
+                    "example": '{"bid_strategy": "LOWEST_COST_WITHOUT_CAP"}',
+                },
+                indent=2,
+            )
 
         # Bid strategies that require bid_amount (not bid_constraints)
         strategies_requiring_bid_amount = [
-            'LOWEST_COST_WITH_BID_CAP',
-            'COST_CAP',
-            'TARGET_COST',
+            "LOWEST_COST_WITH_BID_CAP",
+            "COST_CAP",
+            "TARGET_COST",
         ]
 
         if bid_strategy in strategies_requiring_bid_amount and bid_amount is None:
-            return json.dumps({
-                "error": f"bid_amount is required when using bid_strategy '{bid_strategy}'",
-                "details": f"The '{bid_strategy}' bid strategy requires you to specify a bid amount in cents",
-                "workaround": "Either provide the bid_amount parameter, or use bid_strategy='LOWEST_COST_WITHOUT_CAP' which does not require a bid amount",
-                "example_with_bid_amount": f'{{"bid_strategy": "{bid_strategy}", "bid_amount": 500}}',
-                "example_without_bid_amount": '{"bid_strategy": "LOWEST_COST_WITHOUT_CAP"}'
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": f"bid_amount is required when using bid_strategy '{bid_strategy}'",
+                    "details": f"The '{bid_strategy}' bid strategy requires you to specify a bid amount in cents",
+                    "workaround": "Either provide the bid_amount parameter, or use bid_strategy='LOWEST_COST_WITHOUT_CAP' which does not require a bid amount",
+                    "example_with_bid_amount": f'{{"bid_strategy": "{bid_strategy}", "bid_amount": 500}}',
+                    "example_without_bid_amount": '{"bid_strategy": "LOWEST_COST_WITHOUT_CAP"}',
+                },
+                indent=2,
+            )
 
         # LOWEST_COST_WITH_MIN_ROAS requires bid_constraints with roas_average_floor
-        if bid_strategy == 'LOWEST_COST_WITH_MIN_ROAS' and not bid_constraints:
-            return json.dumps({
-                "error": "bid_constraints is required when using bid_strategy 'LOWEST_COST_WITH_MIN_ROAS'",
-                "details": "Provide bid_constraints with roas_average_floor (target ROAS * 10000)",
-                "example": '{"bid_strategy": "LOWEST_COST_WITH_MIN_ROAS", "bid_constraints": {"roas_average_floor": 20000}, "optimization_goal": "VALUE"}'
-            }, indent=2)
+        if bid_strategy == "LOWEST_COST_WITH_MIN_ROAS" and not bid_constraints:
+            return json.dumps(
+                {
+                    "error": "bid_constraints is required when using bid_strategy 'LOWEST_COST_WITH_MIN_ROAS'",
+                    "details": "Provide bid_constraints with roas_average_floor (target ROAS * 10000)",
+                    "example": '{"bid_strategy": "LOWEST_COST_WITH_MIN_ROAS", "bid_constraints": {"roas_average_floor": 20000}, "optimization_goal": "VALUE"}',
+                },
+                indent=2,
+            )
 
     params = {}
 
     if name is not None:
-        params['name'] = name
+        params["name"] = name
 
     if frequency_control_specs is not None:
-        params['frequency_control_specs'] = frequency_control_specs
+        params["frequency_control_specs"] = frequency_control_specs
 
     if bid_strategy is not None:
-        params['bid_strategy'] = bid_strategy
+        params["bid_strategy"] = bid_strategy
 
     if bid_amount is not None:
-        params['bid_amount'] = str(bid_amount)
+        params["bid_amount"] = str(bid_amount)
 
     if bid_constraints is not None:
-        params['bid_constraints'] = json.dumps(bid_constraints)
+        params["bid_constraints"] = json.dumps(bid_constraints)
 
     if bid_adjustments is not None:
-        params['bid_adjustments'] = json.dumps(bid_adjustments)
+        params["bid_adjustments"] = json.dumps(bid_adjustments)
 
     if status is not None:
-        params['status'] = status
-        
+        params["status"] = status
+
     if optimization_goal is not None:
-        params['optimization_goal'] = optimization_goal
-        
+        params["optimization_goal"] = optimization_goal
+
     if targeting is not None:
         # Ensure proper JSON encoding for targeting
         if isinstance(targeting, dict):
-            params['targeting'] = json.dumps(targeting)
+            params["targeting"] = json.dumps(targeting)
         else:
-            params['targeting'] = targeting  # Already a string
-    
+            params["targeting"] = targeting  # Already a string
+
     # Add budget parameters if provided
     if daily_budget is not None:
-        params['daily_budget'] = str(daily_budget)
-    
+        params["daily_budget"] = str(daily_budget)
+
     if lifetime_budget is not None:
-        params['lifetime_budget'] = str(lifetime_budget)
-    
+        params["lifetime_budget"] = str(lifetime_budget)
+
     if is_dynamic_creative is not None:
-        params['is_dynamic_creative'] = "true" if bool(is_dynamic_creative) else "false"
+        params["is_dynamic_creative"] = "true" if bool(is_dynamic_creative) else "false"
 
     if start_time is not None:
-        params['start_time'] = start_time
+        params["start_time"] = start_time
 
     if end_time is not None:
-        params['end_time'] = end_time
+        params["end_time"] = end_time
 
     if dsa_beneficiary is not None:
-        params['dsa_beneficiary'] = dsa_beneficiary
+        params["dsa_beneficiary"] = dsa_beneficiary
 
     if dsa_payor is not None:
-        params['dsa_payor'] = dsa_payor
+        params["dsa_payor"] = dsa_payor
 
     if multi_advertiser_ads is not None:
-        params['multi_advertiser_ads'] = str(multi_advertiser_ads)
+        params["multi_advertiser_ads"] = str(multi_advertiser_ads)
 
     if regional_regulated_categories is not None:
-        params['regional_regulated_categories'] = json.dumps(regional_regulated_categories)
+        params["regional_regulated_categories"] = json.dumps(regional_regulated_categories)
 
     if regional_regulation_identities is not None:
-        params['regional_regulation_identities'] = json.dumps(regional_regulation_identities)
+        params["regional_regulation_identities"] = json.dumps(regional_regulation_identities)
 
     if attribution_spec is not None:
-        params['attribution_spec'] = json.dumps(attribution_spec)
+        params["attribution_spec"] = json.dumps(attribution_spec)
 
     if not params:
         return json.dumps({"error": "No update parameters provided"}, indent=2)
 
     endpoint = f"{adset_id}"
-    
+
     try:
         # Use POST method for updates as per Meta API documentation
         data = await make_api_request(endpoint, access_token, params, method="POST")
@@ -681,8 +742,6 @@ async def update_adset(adset_id: str, frequency_control_specs: Optional[List[Dic
     except Exception as e:
         error_msg = str(e)
         # Include adset_id in error for better context
-        return json.dumps({
-            "error": f"Failed to update ad set {adset_id}",
-            "details": error_msg,
-            "params_sent": params
-        }, indent=2) 
+        return json.dumps(
+            {"error": f"Failed to update ad set {adset_id}", "details": error_msg, "params_sent": params}, indent=2
+        )

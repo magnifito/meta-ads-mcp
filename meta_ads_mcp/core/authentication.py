@@ -19,21 +19,19 @@ Environment Variables:
 - META_ADS_DISABLE_LOGIN_LINK: Hard-disables the get_login_link tool
 """
 
-import json
-from typing import Optional
 import asyncio
+import json
 import os
-from .api import meta_api_tool
-from . import auth
-from .auth import start_callback_server, shutdown_callback_server, auth_manager
+
+from .auth import auth_manager, start_callback_server
 from .server import mcp_server
-from .utils import logger, META_APP_SECRET
+from .utils import META_APP_SECRET, logger
 
 # Only register the login link tool if not explicitly disabled
 ENABLE_LOGIN_LINK = not bool(os.environ.get("META_ADS_DISABLE_LOGIN_LINK", ""))
 
 
-async def get_login_link(access_token: Optional[str] = None) -> str:
+async def get_login_link(access_token: str | None = None) -> str:
     """
     Get a clickable login link for Meta Ads authentication.
 
@@ -54,26 +52,36 @@ async def get_login_link(access_token: Optional[str] = None) -> str:
     # If we already have a valid token and none was provided, just return success
     if cached_token and not access_token:
         logger.info("get_login_link called with existing valid token")
-        return json.dumps({
-            "message": "Already Authenticated",
-            "status": "You're successfully authenticated with Meta Ads!",
-            "token_info": f"Token preview: {cached_token[:10]}...",
-            "created_at": auth_manager.token_info.created_at if hasattr(auth_manager, "token_info") and auth_manager.token_info else None,
-            "expires_in": auth_manager.token_info.expires_in if hasattr(auth_manager, "token_info") and auth_manager.token_info else None,
-            "authentication_method": "meta_oauth",
-            "ready_to_use": "You can now use all Meta Ads MCP tools and commands."
-        }, indent=2)
+        return json.dumps(
+            {
+                "message": "Already Authenticated",
+                "status": "You're successfully authenticated with Meta Ads!",
+                "token_info": f"Token preview: {cached_token[:10]}...",
+                "created_at": auth_manager.token_info.created_at
+                if hasattr(auth_manager, "token_info") and auth_manager.token_info
+                else None,
+                "expires_in": auth_manager.token_info.expires_in
+                if hasattr(auth_manager, "token_info") and auth_manager.token_info
+                else None,
+                "authentication_method": "meta_oauth",
+                "ready_to_use": "You can now use all Meta Ads MCP tools and commands.",
+            },
+            indent=2,
+        )
 
     if callback_server_disabled:
-        return json.dumps({
-            "message": "Local Authentication Unavailable",
-            "error": "The local callback server is disabled (META_ADS_DISABLE_CALLBACK_SERVER is set)",
-            "solutions": [
-                "Set META_ACCESS_TOKEN environment variable with a Meta System User token",
-                "Unset META_ADS_DISABLE_CALLBACK_SERVER to use the local OAuth flow",
-            ],
-            "authentication_method": "meta_oauth_disabled"
-        }, indent=2)
+        return json.dumps(
+            {
+                "message": "Local Authentication Unavailable",
+                "error": "The local callback server is disabled (META_ADS_DISABLE_CALLBACK_SERVER is set)",
+                "solutions": [
+                    "Set META_ACCESS_TOKEN environment variable with a Meta System User token",
+                    "Unset META_ADS_DISABLE_CALLBACK_SERVER to use the local OAuth flow",
+                ],
+                "authentication_method": "meta_oauth_disabled",
+            },
+            indent=2,
+        )
 
     # Start the local callback server and produce a direct Facebook OAuth URL
     logger.info("Starting callback server for authentication")
@@ -88,16 +96,19 @@ async def get_login_link(access_token: Optional[str] = None) -> str:
         logger.info(f"Generated login URL: {login_url}")
     except Exception as e:
         logger.error(f"Failed to start callback server: {e}")
-        return json.dumps({
-            "message": "Local Authentication Unavailable",
-            "error": "Cannot start local callback server for authentication",
-            "reason": str(e),
-            "solutions": [
-                "Set META_ACCESS_TOKEN environment variable with a Meta System User token",
-                "Check if another service is using the required ports",
-            ],
-            "authentication_method": "meta_oauth_disabled"
-        }, indent=2)
+        return json.dumps(
+            {
+                "message": "Local Authentication Unavailable",
+                "error": "Cannot start local callback server for authentication",
+                "reason": str(e),
+                "solutions": [
+                    "Set META_ACCESS_TOKEN environment variable with a Meta System User token",
+                    "Check if another service is using the required ports",
+                ],
+                "authentication_method": "meta_oauth_disabled",
+            },
+            indent=2,
+        )
 
     # Check if we can exchange for long-lived tokens
     token_exchange_supported = bool(META_APP_SECRET)
@@ -113,13 +124,14 @@ async def get_login_link(access_token: Optional[str] = None) -> str:
         "token_duration": f"Your token will be valid for approximately {token_duration}",
         "authentication_method": "meta_oauth",
         "what_happens_next": "After clicking, you'll be redirected to Meta's authentication page. Once completed, your token will be automatically saved.",
-        "security_note": "This uses a secure local callback server for development purposes."
+        "security_note": "This uses a secure local callback server for development purposes.",
     }
 
     # Wait a moment to ensure the server is fully started
     await asyncio.sleep(1)
 
     return json.dumps(response, indent=2)
+
 
 # Conditionally register as MCP tool only when enabled
 if ENABLE_LOGIN_LINK:
